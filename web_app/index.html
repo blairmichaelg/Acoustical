@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Acoustic Cover Assistant</title>
+  <style>
+    body { font-family: sans-serif; margin: 2em; }
+    .section { margin-bottom: 2em; }
+    label { display: block; margin-bottom: 0.5em; }
+    input, button, select { margin-bottom: 1em; }
+    pre { background: #f4f4f4; padding: 1em; border-radius: 4px; }
+    a.bug-link { color: #b30000; text-decoration: underline; }
+    button:focus, input:focus { outline: 2px solid #0078d7; }
+  </style>
+</head>
+<body>
+  <h1>Acoustic Cover Assistant</h1>
+  <div class="section">
+    <h2>Audio Downloader</h2>
+    <label>Audio URL: <input type="text" id="download-audio-url" aria-label="Audio URL"></label>
+    <button id="download-audio-btn">Download</button>
+    <button type="button" id="download-audio-clear-btn" aria-label="Clear Download Result">Clear</button>
+    <div id="download-audio-loading" style="display:none;color:#888;">Downloading...</div>
+    <pre id="download-audio-result" aria-live="polite"></pre>
+  </div>
+    <h2>1. Extract Chords</h2>
+    <form id="extract-form" aria-label="Extract Chords Form">
+      <label>Audio File: <input type="file" name="audio" required aria-label="Audio File" tabindex="1"></label>
+      <button type="submit" tabindex="2">Extract</button>
+      <button type="button" id="extract-clear-btn" aria-label="Clear Extract Result" tabindex="3">Clear</button>
+    </form>
+    <div style="margin-top:1em;">
+      <label>Batch Audio Files: <input type="file" id="extract-batch-files" name="audios" multiple aria-label="Batch Audio Files" tabindex="4"></label>
+      <button type="button" id="extract-batch-btn" tabindex="5">Batch Extract</button>
+      <button type="button" id="extract-batch-clear-btn" aria-label="Clear Batch Extract Result" tabindex="6">Clear</button>
+      <div id="extract-batch-loading" style="display:none;color:#888;">Batch extracting...</div>
+      <pre id="extract-batch-result" aria-live="polite" tabindex="7"></pre>
+    </div>
+    <div id="extract-loading" style="display:none;color:#888;">Extracting...</div>
+    <pre id="extract-result" aria-live="polite" tabindex="8"></pre>
+    <div id="chord-chart" style="margin-top:1em;"></div>
+  </div>
+  <div class="section">
+    <h2>2. Transpose Chords</h2>
+    <label>Chords JSON: <input type="file" id="transpose-chords-json" accept="application/json" aria-label="Chords JSON" tabindex="5"></label>
+    <label>Semitones: <input type="number" id="transpose-semitones" value="2" aria-label="Semitones" tabindex="6"></label>
+    <button id="transpose-btn" tabindex="7">Transpose</button>
+    <button type="button" id="transpose-clear-btn" aria-label="Clear Transpose Result" tabindex="8">Clear</button>
+    <div id="transpose-loading" style="display:none;color:#888;">Transposing...</div>
+    <pre id="transpose-result" aria-live="polite" tabindex="9"></pre>
+  </div>
+  <div class="section">
+    <h2>3. Capo Advisor</h2>
+    <label>Chords JSON: <input type="file" id="capo-chords-json" accept="application/json" aria-label="Chords JSON" tabindex="10"></label>
+    <button id="capo-btn" tabindex="11">Recommend Capo</button>
+    <button type="button" id="capo-clear-btn" aria-label="Clear Capo Result" tabindex="12">Clear</button>
+    <div id="capo-loading" style="display:none;color:#888;">Calculating...</div>
+    <pre id="capo-result" aria-live="polite" tabindex="13"></pre>
+  </div>
+  <div class="section">
+    <h2>4. Flourish Generator</h2>
+    <label>Chords JSON: <input type="file" id="flourish-chords-json" accept="application/json" aria-label="Chords JSON" tabindex="14"></label>
+    <label>Method:
+      <select id="flourish-method" aria-label="Flourish Method" tabindex="15">
+        <option value="rule_based">Rule-based</option>
+        <option value="magenta">Magenta</option>
+        <option value="gpt4all">GPT4All</option>
+      </select>
+    </label>
+    <label id="flourish-lyrics-label" style="display:none;">Lyrics (optional for GPT4All): <input type="text" id="flourish-lyrics" aria-label="Lyrics"></label>
+    <button id="flourish-btn" tabindex="16">Suggest Flourishes</button>
+    <button type="button" id="flourish-clear-btn" aria-label="Clear Flourish Result" tabindex="17">Clear</button>
+    <div id="flourish-loading" style="display:none;color:#888;">Generating...</div>
+    <pre id="flourish-result" aria-live="polite" tabindex="18"></pre>
+  </div>
+  <div class="section">
+    <h2>Backend Status</h2>
+    <button id="backend-status-btn" tabindex="18">Check Backends</button>
+    <button type="button" id="backend-status-clear-btn" aria-label="Clear Backend Status" tabindex="19">Clear</button>
+    <div id="backend-status-loading" style="display:none;color:#888;">Checking...</div>
+    <pre id="backend-status-result" aria-live="polite" tabindex="20"></pre>
+  </div>
+  <footer>
+    <a href="https://github.com/yourusername/yourrepo/issues" class="bug-link" target="_blank" tabindex="21">Report Bug / Feedback</a>
+  </footer>
+  <script>
+    // Helper to read file as JSON
+    // Audio Downloader
+    document.getElementById('download-audio-btn').onclick = async function() {
+      const url = document.getElementById('download-audio-url').value.trim();
+      document.getElementById('download-audio-loading').style.display = '';
+      document.getElementById('download-audio-result').textContent = '';
+      if (!url) {
+        document.getElementById('download-audio-result').textContent = 'Please enter a URL.';
+        document.getElementById('download-audio-loading').style.display = 'none';
+        return;
+      }
+      try {
+        const res = await fetch('/download_audio', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url })
+        });
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById('download-audio-result').textContent = `Downloaded: ${data.filename}`;
+          document.getElementById('download-audio-result').style.color = '';
+        } else {
+          document.getElementById('download-audio-result').textContent = data.error || 'Download failed.';
+          document.getElementById('download-audio-result').style.color = '#b30000';
+        }
+      } catch (e) {
+        document.getElementById('download-audio-result').textContent = 'Error: ' + e;
+        document.getElementById('download-audio-result').style.color = '#b30000';
+      } finally {
+        document.getElementById('download-audio-loading').style.display = 'none';
+      }
+    };
+    document.getElementById('download-audio-clear-btn').onclick = function() {
+      document.getElementById('download-audio-result').textContent = '';
+      document.getElementById('download-audio-result').style.color = '';
+      document.getElementById('download-audio-url').value = '';
+    };
+    function readJsonFile(input, cb) {
+      const file = input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => cb(JSON.parse(e.target.result));
+      reader.readAsText(file);
+    }
+    // Extract Chords
+    document.getElementById('extract-form').onsubmit = async function(e) {
+      e.preventDefault();
+      document.getElementById('extract-loading').style.display = '';
+      document.getElementById('extract-result').textContent = '';
+      document.getElementById('chord-chart').innerHTML = '';
+      const form = e.target;
+      const data = new FormData(form);
+      try {
+        const res = await fetch('/extract_chords', { method: 'POST', body: data });
+        const text = await res.text();
+        document.getElementById('extract-result').textContent = text;
+        if (res.ok) {
+          try {
+            const json = JSON.parse(text);
+            if (json.chords) {
+              renderChordChart(json.chords, 'chord-chart');
+            }
+          } catch {}
+          document.getElementById('extract-result').style.color = '';
+        } else {
+          document.getElementById('extract-result').style.color = '#b30000';
+        }
+      } finally {
+        document.getElementById('extract-loading').style.display = 'none';
+      }
+    };
+    document.getElementById('extract-clear-btn').onclick = function() {
+      document.getElementById('extract-result').textContent = '';
+      document.getElementById('extract-result').style.color = '';
+      document.getElementById('chord-chart').innerHTML = '';
+    };
+    // Batch Extract
+    document.getElementById('extract-batch-btn').onclick = async function() {
+      document.getElementById('extract-batch-loading').style.display = '';
+      document.getElementById('extract-batch-result').textContent = '';
+      const input = document.getElementById('extract-batch-files');
+      const files = input.files;
+      if (!files.length) return;
+      const data = new FormData();
+      for (let i = 0; i < files.length; i++) {
+        data.append('audios', files[i]);
+      }
+      try {
+        const res = await fetch('/extract_chords_batch', { method: 'POST', body: data });
+        const text = await res.text();
+        document.getElementById('extract-batch-result').textContent = text;
+        if (!res.ok) document.getElementById('extract-batch-result').style.color = '#b30000';
+        else document.getElementById('extract-batch-result').style.color = '';
+      } finally {
+        document.getElementById('extract-batch-loading').style.display = 'none';
+      }
+    };
+    document.getElementById('extract-batch-clear-btn').onclick = function() {
+      document.getElementById('extract-batch-result').textContent = '';
+      document.getElementById('extract-batch-result').style.color = '';
+    };
+    // Transpose
+    document.getElementById('transpose-btn').onclick = async function() {
+      document.getElementById('transpose-loading').style.display = '';
+      document.getElementById('transpose-result').textContent = '';
+      readJsonFile(document.getElementById('transpose-chords-json'), async chords => {
+        const semitones = parseInt(document.getElementById('transpose-semitones').value);
+        try {
+          const res = await fetch('/transpose', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chords, semitones })
+          });
+          const text = await res.text();
+          document.getElementById('transpose-result').textContent = text;
+          if (!res.ok) document.getElementById('transpose-result').style.color = '#b30000';
+          else document.getElementById('transpose-result').style.color = '';
+        } finally {
+          document.getElementById('transpose-loading').style.display = 'none';
+        }
+      });
+    };
+    document.getElementById('transpose-clear-btn').onclick = function() {
+      document.getElementById('transpose-result').textContent = '';
+      document.getElementById('transpose-result').style.color = '';
+    };
+    // Capo
+    document.getElementById('capo-btn').onclick = async function() {
+      document.getElementById('capo-loading').style.display = '';
+      document.getElementById('capo-result').textContent = '';
+      readJsonFile(document.getElementById('capo-chords-json'), async chords => {
+        try {
+          const res = await fetch('/capo', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chords })
+          });
+          const text = await res.text();
+          document.getElementById('capo-result').textContent = text;
+          if (!res.ok) document.getElementById('capo-result').style.color = '#b30000';
+          else document.getElementById('capo-result').style.color = '';
+        } finally {
+          document.getElementById('capo-loading').style.display = 'none';
+        }
+      });
+    };
+    document.getElementById('capo-clear-btn').onclick = function() {
+      document.getElementById('capo-result').textContent = '';
+      document.getElementById('capo-result').style.color = '';
+    };
+    // Flourish
+    const flourishMethod = document.getElementById('flourish-method');
+    const flourishLyricsLabel = document.getElementById('flourish-lyrics-label');
+    flourishMethod.onchange = function() {
+      if (flourishMethod.value === 'gpt4all') {
+        flourishLyricsLabel.style.display = '';
+      } else {
+        flourishLyricsLabel.style.display = 'none';
+      }
+    };
+    document.getElementById('flourish-btn').onclick = async function() {
+      document.getElementById('flourish-loading').style.display = '';
+      document.getElementById('flourish-result').textContent = '';
+      readJsonFile(document.getElementById('flourish-chords-json'), async chords => {
+        const method = flourishMethod.value;
+        const lyrics = document.getElementById('flourish-lyrics').value;
+        const payload = { chords, method };
+        if (method === 'gpt4all' && lyrics) payload.lyrics = lyrics;
+        try {
+          const res = await fetch('/flourish', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          const text = await res.text();
+          document.getElementById('flourish-result').textContent = text;
+          if (!res.ok) document.getElementById('flourish-result').style.color = '#b30000';
+          else document.getElementById('flourish-result').style.color = '';
+        } finally {
+          document.getElementById('flourish-loading').style.display = 'none';
+        }
+      });
+    };
+    document.getElementById('flourish-clear-btn').onclick = function() {
+      document.getElementById('flourish-result').textContent = '';
+      document.getElementById('flourish-result').style.color = '';
+    };
+    // Chord Chart Visualization
+    function renderChordChart(chords, targetId) {
+      if (!Array.isArray(chords) || !chords.length) return;
+      const container = document.getElementById(targetId);
+      const chart = document.createElement('div');
+      chart.style.display = 'flex';
+      chart.style.flexWrap = 'wrap';
+      chart.style.gap = '0.5em';
+      chords.forEach(c => {
+        const el = document.createElement('span');
+        el.textContent = c.chord || c;
+        el.style.background = '#e0eaff';
+        el.style.padding = '0.3em 0.7em';
+        el.style.borderRadius = '4px';
+        el.style.fontWeight = 'bold';
+        el.style.fontSize = '1.1em';
+        chart.appendChild(el);
+      });
+      container.innerHTML = '<b>Chord Chart:</b><br>';
+      container.appendChild(chart);
+    }
+    // Backend Status
+    document.getElementById('backend-status-btn').onclick = async function() {
+      document.getElementById('backend-status-loading').style.display = '';
+      document.getElementById('backend-status-result').textContent = '';
+      try {
+        const res = await fetch('/backend_status');
+        const text = await res.text();
+        document.getElementById('backend-status-result').textContent = text;
+        if (!res.ok) document.getElementById('backend-status-result').style.color = '#b30000';
+        else document.getElementById('backend-status-result').style.color = '';
+      } finally {
+        document.getElementById('backend-status-loading').style.display = 'none';
+      }
+    };
+    document.getElementById('backend-status-clear-btn').onclick = function() {
+      document.getElementById('backend-status-result').textContent = '';
+      document.getElementById('backend-status-result').style.color = '';
+    };
+    // Keyboard navigation: focus next on Enter
+    document.querySelectorAll('input,button').forEach((el, idx, arr) => {
+      el.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !el.type === 'submit') {
+          e.preventDefault();
+          let next = arr[idx + 1];
+          if (next) next.focus();
+        }
+      });
+    });
+  </script>
+</body>
+</html>

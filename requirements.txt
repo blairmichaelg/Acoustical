@@ -1,0 +1,15 @@
+music21
+click
+flask
+
+# Optional/Advanced features (may be difficult to install on Windows):
+# Uncomment to enable these features.
+aubio           # Optional: Used for onset detection and audio analysis
+essentia        # Optional: Advanced audio analysis (Linux/Mac recommended)
+magenta         # Optional: Flourish generation (requires TensorFlow, best on Linux/Mac)
+
+# For Magenta: pip install magenta
+# For Essentia: see https://essentia.upf.edu/documentation/installing.html
+
+# For advanced users: consider using Poetry or Pipenv for optional dependencies.
+# Example (Poetry): poetry add --optional essentia magenta aubio
