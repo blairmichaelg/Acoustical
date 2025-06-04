@@ -30,8 +30,8 @@ class ChordShape(NamedTuple):
 
 COMMON_CHORD_SHAPE_TEMPLATES: Dict[str, List[ChordShape]] = {
     "maj": [
-        ChordShape("E Shape Barre", "E", "maj", fingerings=[(0,0,1),(1,2,3),(2,2,4),(3,1,2),(4,0,1),(5,0,1)], base_fret_of_template=0, is_movable=True, barre_strings_offset=[0,4,5]),
-        ChordShape("A Shape Barre", "A", "maj", fingerings=[(0,-1,-1),(1,0,1),(2,2,2),(3,2,3),(4,2,4),(5,0,1)], base_fret_of_template=0, is_movable=True, barre_strings_offset=[1,5]),
+        ChordShape("E Shape Barre", "E", "maj", fingerings=[(0,0,1),(1,2,3),(2,2,4),(3,1,2),(4,0,1),(5,0,1)], base_fret_of_template=0, is_movable=True, barre_strings_offset=[0,1,2,3,4,5]), # Full barre
+        ChordShape("A Shape Barre", "A", "maj", fingerings=[(0,-1,-1),(1,0,1),(2,2,2),(3,2,3),(4,2,4),(5,0,1)], base_fret_of_template=0, is_movable=True, barre_strings_offset=[1,2,3,4,5]), # Barre on 5 strings
         ChordShape("C Major Open", "C", "maj", fingerings=[(0,-1,-1),(1,3,3),(2,2,2),(3,0,0),(4,1,1),(5,0,0)]),
         ChordShape("G Major Open", "G", "maj", fingerings=[(0,3,2),(1,2,1),(2,0,0),(3,0,0),(4,0,0),(5,3,3)]),
         ChordShape("D Major Open", "D", "maj", fingerings=[(0,-1,-1),(1,-1,-1),(2,0,0),(3,2,1),(4,3,2),(5,2,0)]),
@@ -39,15 +39,15 @@ COMMON_CHORD_SHAPE_TEMPLATES: Dict[str, List[ChordShape]] = {
         ChordShape("E Major Open", "E", "maj", fingerings=[(0,0,0),(1,2,2),(2,2,3),(3,1,1),(4,0,0),(5,0,0)]),
     ],
     "min": [
-        ChordShape("Em Shape Barre", "E", "min", fingerings=[(0,0,1),(1,2,3),(2,2,4),(3,0,1),(4,0,1),(5,0,1)], base_fret_of_template=0, is_movable=True, barre_strings_offset=[0,3,4,5]),
-        ChordShape("Am Shape Barre", "A", "min", fingerings=[(0,-1,-1),(1,0,1),(2,2,3),(3,2,4),(4,1,2),(5,0,1)], base_fret_of_template=0, is_movable=True, barre_strings_offset=[1,5]),
+        ChordShape("Em Shape Barre", "E", "min", fingerings=[(0,0,1),(1,2,3),(2,2,4),(3,0,1),(4,0,1),(5,0,1)], base_fret_of_template=0, is_movable=True, barre_strings_offset=[0,1,2,3,4,5]), # Full barre
+        ChordShape("Am Shape Barre", "A", "min", fingerings=[(0,-1,-1),(1,0,1),(2,2,3),(3,2,4),(4,1,2),(5,0,1)], base_fret_of_template=0, is_movable=True, barre_strings_offset=[1,2,3,4,5]), # Barre on 5 strings
         ChordShape("Am Minor Open", "A", "min", fingerings=[(0,-1,-1),(1,0,0),(2,2,2),(3,2,3),(4,1,1),(5,0,0)]),
         ChordShape("Em Minor Open", "E", "min", fingerings=[(0,0,0),(1,2,2),(2,2,3),(3,0,0),(4,0,0),(5,0,0)]),
         ChordShape("Dm Minor Open", "D", "min", fingerings=[(0,-1,-1),(1,-1,-1),(2,0,0),(3,2,2),(4,3,3),(5,1,1)]),
     ],
     "7": [
-        ChordShape("E7 Shape Barre", "E", "7", fingerings=[(0,0,1),(1,2,3),(2,0,1),(3,1,2),(4,0,1),(5,0,1)], base_fret_of_template=0, is_movable=True, barre_strings_offset=[0,2,4,5]),
-        ChordShape("A7 Shape Barre", "A", "7", fingerings=[(0,-1,-1),(1,0,1),(2,2,2),(3,0,1),(4,2,3),(5,0,1)], base_fret_of_template=0, is_movable=True, barre_strings_offset=[1,3,5]),
+        ChordShape("E7 Shape Barre", "E", "7", fingerings=[(0,0,1),(1,2,3),(2,0,1),(3,1,2),(4,0,1),(5,0,1)], base_fret_of_template=0, is_movable=True, barre_strings_offset=[0,1,2,3,4,5]), # Full barre
+        ChordShape("A7 Shape Barre", "A", "7", fingerings=[(0,-1,-1),(1,0,1),(2,2,2),(3,0,1),(4,2,3),(5,0,1)], base_fret_of_template=0, is_movable=True, barre_strings_offset=[1,2,3,4,5]), # Barre on 5 strings
         ChordShape("C7 Open", "C", "7", fingerings=[(0,-1,-1),(1,3,3),(2,2,2),(3,3,4),(4,1,1),(5,0,0)]),
         ChordShape("G7 Open", "G", "7", fingerings=[(0,3,3),(1,2,2),(2,0,0),(3,0,0),(4,0,0),(5,1,1)]),
         ChordShape("D7 Open", "D", "7", fingerings=[(0,-1,-1),(1,-1,-1),(2,0,0),(3,2,1),(4,1,2),(5,2,3)]),
@@ -55,12 +55,16 @@ COMMON_CHORD_SHAPE_TEMPLATES: Dict[str, List[ChordShape]] = {
         ChordShape("E7 Open", "E", "7", fingerings=[(0,0,0),(1,2,1),(2,0,0),(3,1,2),(4,0,0),(5,0,0)]),
     ],
     "maj7": [
+        ChordShape("E Shape maj7 Barre", "E", "maj7", fingerings=[(0,0,1),(1,2,3),(2,1,2),(3,1,2),(4,0,1),(5,0,1)], base_fret_of_template=0, is_movable=True, barre_strings_offset=[0,1,2,3,4,5]), # Full barre
+        ChordShape("A Shape maj7 Barre", "A", "maj7", fingerings=[(0,-1,-1),(1,0,1),(2,2,3),(3,1,2),(4,2,4),(5,0,1)], base_fret_of_template=0, is_movable=True, barre_strings_offset=[1,2,3,4,5]), # Barre on 5 strings
         ChordShape("Cmaj7 Open", "C", "maj7", fingerings=[(0,-1,-1),(1,3,3),(2,2,2),(3,0,0),(4,0,0),(5,0,0)]),
         ChordShape("Gmaj7 Open", "G", "maj7", fingerings=[(0,3,2),(1,2,1),(2,0,0),(3,0,0),(4,0,0),(5,2,0)]),
         ChordShape("Amaj7 Open", "A", "maj7", fingerings=[(0,-1,-1),(1,0,0),(2,2,2),(3,1,1),(4,2,0),(5,0,0)]),
         ChordShape("Dmaj7 Open", "D", "maj7", fingerings=[(0,-1,-1),(1,-1,-1),(2,0,0),(3,2,2),(4,2,3),(5,2,1)]),
     ],
     "m7": [
+        ChordShape("Em7 Shape Barre", "E", "m7", fingerings=[(0,0,1),(1,2,1),(2,0,1),(3,0,1),(4,0,1),(5,0,1)], base_fret_of_template=0, is_movable=True, barre_strings_offset=[0,1,2,3,4,5]), # Full barre, one finger often for Em7
+        ChordShape("Am7 Shape Barre", "A", "m7", fingerings=[(0,-1,-1),(1,0,1),(2,2,3),(3,0,1),(4,1,2),(5,0,1)], base_fret_of_template=0, is_movable=True, barre_strings_offset=[1,2,3,4,5]), # Barre on 5 strings
         ChordShape("Am7 Open", "A", "m7", fingerings=[(0,-1,-1),(1,0,0),(2,2,2),(3,0,0),(4,1,1),(5,0,0)]),
         ChordShape("Em7 Open", "E", "m7", fingerings=[(0,0,0),(1,2,0),(2,0,0),(3,0,0),(4,0,0),(5,0,0)]),
         ChordShape("Dm7 Open", "D", "m7", fingerings=[(0,-1,-1),(1,-1,-1),(2,0,0),(3,2,2),(4,1,1),(5,1,0)]),
@@ -96,17 +100,22 @@ def _transpose_shape(template: ChordShape, target_root_str: str) -> Optional[Cho
             new_fingerings.append((string_idx, -1, -1))
         else:
             actual_fret = new_base_fret + fret_offset
+            # For barre chords, finger '1' often indicates the barre.
+            # Open strings in template (fret_offset=0, finger=0) become fretted by barre (actual_fret=new_base_fret, finger=1)
+            # unless they are explicitly muted or fretted by another finger in the template.
+            # This logic is implicitly handled if template fingerings are correct for barre.
+            # E.g. E shape barre (0,0,1) means 0th string, 0th fret relative to barre, use finger 1 (barre)
             new_fingerings.append((string_idx, actual_fret, finger))
 
     actual_barre_strings = template.barre_strings_offset
 
     return ChordShape(
         name=f"{template.name} for {target_root_str}",
-        template_root_note_str=target_root_str, # New root
+        template_root_note_str=target_root_str, 
         chord_type=template.chord_type,
         fingerings=new_fingerings,
-        base_fret_of_template=new_base_fret, # This is the new effective base/barre fret
-        is_movable=True,
+        base_fret_of_template=new_base_fret, 
+        is_movable=True, # The new shape is also considered movable in principle
         barre_strings_offset=actual_barre_strings
     )
 
@@ -123,7 +132,7 @@ def get_shapes_for_chord(root_note_str: str, chord_type: str) -> List[ChordShape
         normalized_type = "maj"
     elif normalized_type in ["dominant7", "dom7"]:
         normalized_type = "7"
-    # Ensure other types like "maj7", "m7" are passed through or normalized if needed
+    # Other types like "maj7", "m7" will be used as is if they are keys in COMMON_CHORD_SHAPE_TEMPLATES
 
     shapes = []
     type_specific_templates = COMMON_CHORD_SHAPE_TEMPLATES.get(normalized_type, [])
@@ -147,8 +156,9 @@ if __name__ == '__main__':
     tests = [
         ("C", "maj"), ("G", "maj"), ("F#", "maj"), ("Bb", "maj"),
         ("A", "min"), ("C#", "min"),
-        ("E", "7"), ("B", "7"),
-        ("G", "maj7"), ("D", "m7")
+        ("E", "7"), ("B", "7"), ("F", "7"),
+        ("G", "maj7"), ("A", "maj7"), ("F", "maj7"),
+        ("D", "m7"), ("G", "m7"), ("C#", "m7")
     ]
     for root, type_c in tests:
         shapes_found = get_shapes_for_chord(root, type_c)

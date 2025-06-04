@@ -93,12 +93,27 @@ CHORD_QUALITY_PATTERNS = [
 
 
 def get_note_value(note_str: str) -> Optional[int]:
-    """Parses a note string and returns its numerical value (0-11)."""
-    note_str_cleaned = note_str.strip().capitalize()
-    # Handle common alternative names if necessary, e.g. H for B in some regions
-    if note_str_cleaned == "H": note_str_cleaned = "B"
+    """Parses a note string (e.g., "C", "C#4", "Db3") and returns its numerical pitch class value (0-11)."""
+    if not isinstance(note_str, str): # Handle potential non-string inputs gracefully
+        log.warning(f"Invalid input type for note_str: {type(note_str)}. Expected string.")
+        return None
         
-    val = NOTE_TO_VALUE.get(note_str_cleaned)
+    note_str_processed = note_str.strip().capitalize()
+    
+    # Handle common alternative names
+    if note_str_processed == "H":
+        note_str_processed = "B"
+    
+    # Strip octave numbers and other non-essential characters for pitch class lookup
+    # Regex to extract the core note name (C, C#, Db etc.)
+    match = re.match(r"([A-G][#b]?)", note_str_processed)
+    if not match:
+        log.warning(f"Could not extract valid note name from: {note_str}")
+        return None
+    
+    core_note_name = match.group(1)
+        
+    val = NOTE_TO_VALUE.get(core_note_name)
     if val is None:
         log.warning(f"Could not parse note: {note_str}")
     return val
