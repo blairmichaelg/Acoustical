@@ -1,10 +1,10 @@
 # Acoustic Cover Assistant
 
-![CI](https://github.com/TODO-REPLACE-WITH-USERNAME/TODO-REPLACE-WITH-REPONAME/actions/workflows/python-app.yml/badge.svg)
+![CI](https://github.com/blairmichaelg/Acoustical/actions/workflows/python-app.yml/badge.svg)
 
 A modular, open-source pipeline for extracting chords, analyzing key, transposing, recommending capo positions, and generating musical flourishes from audio. Includes CLI and minimal web interface.
 
-> **Note:** Replace all TODO-REPLACE-WITH-USERNAME/REPONAME with your actual GitHub repository info.
+> **Note:** GitHub repository info has been updated.
 
 ---
 
@@ -62,7 +62,7 @@ python audio_input/downloader.py <url> [--out_dir audio_input]
 - Some dependencies (essentia, magenta, aubio) are difficult to install on Windows.
 - Chordino is not supported on Windows.
 - Large or corrupt audio files may cause extraction to fail or timeout.
-- See [GitHub Issues](https://github.com/TODO-REPLACE-WITH-USERNAME/TODO-REPLACE-WITH-REPONAME/issues) for up-to-date bug reports and workarounds.
+- See [GitHub Issues](https://github.com/blairmichaelg/Acoustical/issues) for up-to-date bug reports and workarounds.
 
 ## How to Add a New Backend/Plugin
 
@@ -137,7 +137,7 @@ Chord extraction supports plugins and fallback logic. Built-in backends (Chordin
 - If a backend fails, errors are logged and reported.
 - For missing dependencies, see requirements.txt and install only what you need.
 - Run `python check_backends.py` for backend diagnostics.
-- For more help, see [GitHub Issues](https://github.com/TODO-REPLACE-WITH-USERNAME/TODO-REPLACE-WITH-REPONAME/issues).
+- For more help, see [GitHub Issues](https://github.com/blairmichaelg/Acoustical/issues).
 
 ---
 
@@ -168,7 +168,7 @@ tests/                      # Organized tests (e.g., chord_extraction/, flourish
 - Continuous Integration: All pushes and pull requests are tested and linted via [GitHub Actions](.github/workflows/python-app.yml).
 - See `/tests` and `/data` for examples.
 - Open a PR or issue for bugs, features, or questions.
-- Good first issues are labeled in [GitHub Issues](https://github.com/yourusername/yourrepo/issues).
+- Good first issues are labeled in [GitHub Issues](https://github.com/blairmichaelg/Acoustical/issues).
 
 ---
 

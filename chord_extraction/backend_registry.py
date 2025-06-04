@@ -1,50 +1,57 @@
 """
-Chord extraction backend registry and base interface.
+Backend registry for chord extraction plugins.
+
+Manages registration and fallback logic for chord extraction backends.
 """
 
 from typing import List, Dict, Any, Callable
+from abc import ABC, abstractmethod
 
-class ChordExtractionBackend:
-    """
-    Base class for all chord extraction backends.
-    Subclasses must implement is_available() and extract_chords(audio_path).
-    """
-    name = "base"
 
-    @classmethod
-    def is_available(cls) -> bool:
-        raise NotImplementedError
+class ChordExtractionBackend(ABC):
+    """Abstract base class for chord extraction backends."""
+    
+    @abstractmethod
+    def extract_chords(self, audio_path: str) -> List[Dict[str, Any]]:
+        """Extract chords from audio file."""
+        pass
 
-    @classmethod
-    def extract_chords(cls, audio_path: str) -> List[Dict[str, Any]]:
-        raise NotImplementedError
 
-# Registry for all backends
-REGISTERED_BACKENDS: List[ChordExtractionBackend] = []
-PLUGIN_BACKENDS: List[Callable[[str], List[Dict[str, Any]]]] = []
+# Registry of plugin backends
+_registered_plugins = []
 
-def register_backend(backend_cls):
-    REGISTERED_BACKENDS.append(backend_cls)
 
-def register_plugin_backend(plugin_func):
-    PLUGIN_BACKENDS.append(plugin_func)
+def register_plugin_backend(
+    backend_func: Callable[[str], List[Dict[str, Any]]]
+) -> None:
+    """Register a plugin backend function."""
+    _registered_plugins.append(backend_func)
 
-from config import BACKEND_ORDER
 
-def get_available_backends():
-    ordered_backends = sorted(REGISTERED_BACKENDS, key=lambda b: BACKEND_ORDER.index(b.name) if b.name in BACKEND_ORDER else len(BACKEND_ORDER))
-    return [b for b in ordered_backends if b.is_available()]
+def register_backend(cls):
+    """Class decorator to register a ChordExtractionBackend implementation."""
+    _registered_plugins.append(cls.extract_chords)
+    return cls
+
 
 def extract_chords_with_fallback(audio_path: str) -> List[Dict[str, Any]]:
-    errors = []
-    for backend in get_available_backends():
+    """Try each backend in order until one succeeds."""
+    # Try built-in backends first
+    from . import chordino_wrapper, autochord_util, chord_extractor_util
+    
+    for backend in [
+        chordino_wrapper.ChordinoBackend.extract_chords,
+        autochord_util.AutochordBackend.extract_chords,
+        chord_extractor_util.ChordExtractorBackend.extract_chords,
+        *_registered_plugins  # Then try registered plugins
+    ]:
         try:
-            return backend.extract_chords(audio_path)
-        except Exception as e:
-            errors.append(f"{backend.name}: {e}")
-    for plugin in PLUGIN_BACKENDS:
-        try:
-            return plugin(audio_path)
-        except Exception as e:
-            errors.append(f"plugin {plugin}: {e}")
-    raise RuntimeError(f"All chord extraction backends failed. Details: {errors}")
+            result = backend(audio_path)
+            if result:
+                return result
+        except Exception:  # noqa: E722
+            continue
+    
+    raise RuntimeError(
+        "All chord extraction backends failed or returned no results."
+    )

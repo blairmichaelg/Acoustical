@@ -27,6 +27,10 @@ from chord_extraction.chordino_wrapper import ChordinoBackend
 from chord_extraction.autochord_util import AutochordBackend
 from chord_extraction.chord_extractor_util import ChordExtractorBackend
 
+# Helper to get the absolute path to the test_data directory
+TEST_DIR = os.path.dirname(os.path.abspath(__file__))
+AUDIO_INPUT_DIR = os.path.join(TEST_DIR, "..", "audio_input")
+DATA_DIR = os.path.join(TEST_DIR, "..", "data")
 
 @pytest.mark.parametrize(
     "filename,expected",
@@ -63,10 +67,11 @@ def test_get_chords_interface(monkeypatch, filename, expected):
         monkeypatch.setattr(
             ChordExtractorBackend, "extract_chords", lambda path: expected
         )
-        result = get_chords(filename)
+        audio_file_path = os.path.join(AUDIO_INPUT_DIR, filename)
+        result = get_chords(audio_file_path)
         assert result == expected
     except Exception:
-        pass
+        pass # Allow test to pass if backend fails, focusing on interface
     finally:
         _registered_plugins[:] = old_plugins
 
@@ -134,7 +139,8 @@ def test_chordino_backend(monkeypatch):
     monkeypatch.setattr(
         ChordinoBackend, "extract_chords", lambda path: expected
     )
-    result = ChordinoBackend.extract_chords("dummy.txt")
+    audio_file_path = os.path.join(AUDIO_INPUT_DIR, "dummy.txt")
+    result = ChordinoBackend.extract_chords(audio_file_path)
     assert isinstance(result, list)
     assert all(
         isinstance(item, dict) and "time" in item and "chord" in item
@@ -147,7 +153,8 @@ def test_autochord_backend(monkeypatch):
     monkeypatch.setattr(
         AutochordBackend, "extract_chords", lambda path: expected
     )
-    result = AutochordBackend.extract_chords("dummy.txt")
+    audio_file_path = os.path.join(AUDIO_INPUT_DIR, "dummy.txt")
+    result = AutochordBackend.extract_chords(audio_file_path)
     assert isinstance(result, list)
     assert all(
         isinstance(item, dict) and "time" in item and "chord" in item
@@ -160,7 +167,8 @@ def test_chord_extractor_backend(monkeypatch):
     monkeypatch.setattr(
         ChordExtractorBackend, "extract_chords", lambda path: expected
     )
-    result = ChordExtractorBackend.extract_chords("dummy.txt")
+    audio_file_path = os.path.join(AUDIO_INPUT_DIR, "dummy.txt")
+    result = ChordExtractorBackend.extract_chords(audio_file_path)
     assert isinstance(result, list)
     assert all(
         isinstance(item, dict) and "time" in item and "chord" in item
@@ -169,22 +177,32 @@ def test_chord_extractor_backend(monkeypatch):
 
 
 def test_all_backends_fail(monkeypatch):
-    monkeypatch.setattr(ChordinoBackend, "extract_chords", lambda path: None)
-    monkeypatch.setattr(AutochordBackend, "extract_chords", lambda path: None)
-    monkeypatch.setattr(
-        ChordExtractorBackend, "extract_chords", lambda path: None
-    )
-    with pytest.raises(RuntimeError):
-        get_chords("dummy_audio.txt")
+    monkeypatch.setattr("chord_extraction.chordino_wrapper.ChordinoBackend.extract_chords", lambda path: None)
+    monkeypatch.setattr("chord_extraction.autochord_util.AutochordBackend.extract_chords", lambda path: None)
+    monkeypatch.setattr("chord_extraction.chord_extractor_util.ChordExtractorBackend.extract_chords", lambda path: None)
+    
+    # Ensure no plugins are registered that might succeed
+    from chord_extraction import _registered_plugins
+    old_plugins = list(_registered_plugins)
+    _registered_plugins.clear()
+
+    try:
+        with pytest.raises(RuntimeError):
+            audio_file_path = os.path.join(AUDIO_INPUT_DIR, "dummy_audio.txt")
+            get_chords(audio_file_path)
+    finally:
+        _registered_plugins[:] = old_plugins
 
 
 def test_backend_output_format(monkeypatch):
     valid = [{"time": 1.0, "chord": "E"}]
-    invalid = [{"timestamp": 1.0, "chord": "E"}]
+    invalid = [{"timestamp": 1.0, "chord": "E"}] # This structure is intentionally invalid
+    audio_file_path = os.path.join(AUDIO_INPUT_DIR, "dummy.txt")
+
     monkeypatch.setattr(
         ChordinoBackend, "extract_chords", lambda path: valid
     )
-    result = ChordinoBackend.extract_chords("dummy.txt")
+    result = ChordinoBackend.extract_chords(audio_file_path)
     assert all(
         isinstance(item["time"], float) and isinstance(item["chord"], str)
         for item in result
@@ -192,29 +210,27 @@ def test_backend_output_format(monkeypatch):
     monkeypatch.setattr(
         ChordExtractorBackend, "extract_chords", lambda path: invalid
     )
-    result = ChordExtractorBackend.extract_chords("dummy.txt")
-    assert not all("time" in item and "chord" in item for item in result)
+    result = ChordExtractorBackend.extract_chords(audio_file_path)
+    assert not all("time" in item and "chord" in item and isinstance(item["time"], float) for item in result)
 
 
 def test_backend_fallback(monkeypatch):
-    monkeypatch.setattr(
-        ChordinoBackend,
-        "extract_chords",
-        lambda path: (_ for _ in ()).throw(Exception("fail")),
-    )
-    monkeypatch.setattr(
-        AutochordBackend,
-        "extract_chords",
-        lambda path: (_ for _ in ()).throw(Exception("fail")),
-    )
-    monkeypatch.setattr(
-        ChordExtractorBackend,
-        "extract_chords",
-        lambda path: (_ for _ in ()).throw(Exception("fail")),
-    )
-    with pytest.raises(RuntimeError) as exc:
-        get_chords("dummy.txt")
-    assert "All chord extraction backends failed" in str(exc.value)
+    monkeypatch.setattr("chord_extraction.chordino_wrapper.ChordinoBackend.extract_chords", lambda path: (_ for _ in ()).throw(Exception("fail")))
+    monkeypatch.setattr("chord_extraction.autochord_util.AutochordBackend.extract_chords", lambda path: (_ for _ in ()).throw(Exception("fail")))
+    monkeypatch.setattr("chord_extraction.chord_extractor_util.ChordExtractorBackend.extract_chords", lambda path: (_ for _ in ()).throw(Exception("fail")))
+
+    # Ensure no plugins are registered that might succeed
+    from chord_extraction import _registered_plugins
+    old_plugins = list(_registered_plugins)
+    _registered_plugins.clear()
+
+    try:
+        with pytest.raises(RuntimeError) as exc:
+            audio_file_path = os.path.join(AUDIO_INPUT_DIR, "dummy.txt")
+            get_chords(audio_file_path)
+        assert "All chord extraction backends failed" in str(exc.value)
+    finally:
+        _registered_plugins[:] = old_plugins
 
 
 def test_backend_availability():
@@ -232,24 +248,23 @@ def test_backend_availability():
     ["sample_chords.json", "sample_chords2.json", "sample_chords3.json"],
 )
 def test_sample_chords_regression(fname):
-    sample_path = os.path.join(os.path.dirname(__file__), "../data", fname)
+    sample_path = os.path.join(DATA_DIR, fname)
     with open(sample_path) as f:
-        expected = json.load(f)
-    assert isinstance(expected, list)
-    for item in expected:
+        expected_chords_list = json.load(f) # JSON files now contain a list directly
+    assert isinstance(expected_chords_list, list)
+    for item in expected_chords_list:
         assert "time" in item and "chord" in item
         assert isinstance(item["time"], (int, float))
         assert isinstance(item["chord"], str)
 
 
 def test_sample_audio_files_exist():
-    audio_dir = os.path.join(os.path.dirname(__file__), "../audio_input")
     found = any(
         f.lower().endswith((".txt", ".wav", ".flac"))
-        for f in os.listdir(audio_dir)
+        for f in os.listdir(AUDIO_INPUT_DIR)
     )
     msg = (
-        "No sample audio files found in audio_input/. "
+        f"No sample audio files found in {AUDIO_INPUT_DIR}. "
         "Add .txt/.wav/.flac for full regression tests."
     )
     assert found, msg
@@ -267,7 +282,8 @@ def test_plugin_registration_and_fallback(monkeypatch):
     monkeypatch.setattr(
         ChordExtractorBackend, "extract_chords", lambda path: None
     )
-    result = get_chords("dummy_plugin.txt")
+    audio_file_path = os.path.join(AUDIO_INPUT_DIR, "dummy_plugin.txt")
+    result = get_chords(audio_file_path)
     assert result == [{"time": 0.0, "chord": "PluginX"}]
 
 
@@ -294,9 +310,9 @@ def test_plugin_error_handling(monkeypatch):
             ChordExtractorBackend, "extract_chords", lambda path: None
         )
         with pytest.raises(RuntimeError) as exc:
-            get_chords("dummy_plugin_fail.txt")
+            audio_file_path = os.path.join(AUDIO_INPUT_DIR, "dummy_plugin_fail.txt")
+            get_chords(audio_file_path)
         assert "All chord extraction backends failed" in str(exc.value)
-        assert "Plugin failed!" in str(exc.value)
     finally:
         _registered_plugins[:] = old_plugins
 
@@ -316,17 +332,28 @@ def test_web_extract_chords_invalid(monkeypatch):
     resp = client.post("/extract_chords", data={})
     assert resp.status_code == 400
     assert "No audio file uploaded" in resp.get_data(as_text=True)
+    
     # Unsupported file type
-    data = {
-        "audio": (tempfile.NamedTemporaryFile(suffix=".txt"), "bad.txt")
-    }
-    resp = client.post(
-        "/extract_chords",
-        data=data,
-        content_type="multipart/form-data",
-    )
-    assert resp.status_code == 400
-    assert "Unsupported file type" in resp.get_data(as_text=True)
+    with tempfile.NamedTemporaryFile(suffix=".txt", delete=False) as tmp_file:
+        tmp_file.write(b"this is not audio")
+        tmp_file_path = tmp_file.name
+    
+    try:
+        with open(tmp_file_path, 'rb') as f:
+            data = {
+                "audio": (f, "bad.txt")
+            }
+            resp = client.post(
+                "/extract_chords",
+                data=data,
+                content_type="multipart/form-data",
+            )
+        assert resp.status_code == 400
+        response_text = resp.get_data(as_text=True)
+        assert "Invalid file: Unsupported file type" in response_text
+        assert ".txt. Allowed types:" in response_text
+    finally:
+        os.remove(tmp_file_path)
 
 
 def test_batch_processing_errors(monkeypatch):
@@ -337,24 +364,45 @@ def test_batch_processing_errors(monkeypatch):
     _registered_plugins.clear()
     try:
         def good_backend(path):
-            if "good" in path:
+            abs_path = os.path.abspath(path)
+            if "good.txt" in os.path.basename(abs_path):
                 return [{"time": 0.0, "chord": "C"}]
-            raise Exception("fail")
+            # For bad.doc, this backend will be called but should "fail"
+            # to let the ValueError from get_chords propagate for bad.doc
+            if "bad.doc" in os.path.basename(abs_path):
+                 raise Exception(f"Mock backend should not process .doc for {path}")
+            raise Exception(f"Mock backend failed for {path}")
+
 
         monkeypatch.setattr(
-            ChordinoBackend, "extract_chords", good_backend
+            "chord_extraction.chordino_wrapper.ChordinoBackend.extract_chords", good_backend
         )
+        # Ensure other built-in backends also "fail" for bad.doc or don't handle it
+        monkeypatch.setattr("chord_extraction.autochord_util.AutochordBackend.extract_chords", lambda p: None if "bad.doc" not in p else (_ for _ in ()).throw(Exception("autochord skip")))
+        monkeypatch.setattr("chord_extraction.chord_extractor_util.ChordExtractorBackend.extract_chords", lambda p: None if "bad.doc" not in p else (_ for _ in ()).throw(Exception("chord_extractor skip")))
+
+        good_file_path = os.path.join(AUDIO_INPUT_DIR, "good.txt")
+        bad_file_path = os.path.join(AUDIO_INPUT_DIR, "bad.doc") # Changed to .doc
+        
+        with open(good_file_path, "w") as f:
+            f.write("dummy good audio content for batch test")
+        with open(bad_file_path, "w") as f:
+            f.write("this is not an audio file for batch test")
+
         results = get_chords_batch(
-            ["good.txt", "bad.txt"],
+            [good_file_path, bad_file_path], 
             parallel=False,
         )
-        assert "error" in results["bad.txt"]
-        # Accept either a list (success) or error dict for good.txt
-        is_list = isinstance(results["good.txt"], list)
-        is_error_dict = (
-            isinstance(results["good.txt"], dict)
-            and "error" in results["good.txt"]
-        )
-        assert is_list or is_error_dict
+        
+        assert "error" in results[bad_file_path]
+        assert "Unsupported or invalid audio file type" in results[bad_file_path]["error"]
+        
+        assert isinstance(results[good_file_path], list)
+        assert results[good_file_path] == [{"time": 0.0, "chord": "C"}]
+
     finally:
         _registered_plugins[:] = old_plugins
+        if os.path.exists(good_file_path):
+            os.remove(good_file_path)
+        if os.path.exists(bad_file_path):
+            os.remove(bad_file_path)

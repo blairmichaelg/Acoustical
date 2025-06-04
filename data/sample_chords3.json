@@ -1,6 +1,12 @@
-[
-    {"time": 0.0, "chord": "E"},
-    {"time": 2.0, "chord": "B"},
-    {"time": 4.0, "chord": "C#m"},
-    {"time": 6.0, "chord": "A"}
-]
+{
+    "metadata": {
+        "file": "test_audio3.wav",
+        "duration": 16.0
+    },
+    "chords": [
+        {"time": 0.0, "chord": "Cmaj7"},
+        {"time": 4.0, "chord": "Dm7"},
+        {"time": 8.0, "chord": "G7"},
+        {"time": 12.0, "chord": "Cmaj7"}
+    ]
+}

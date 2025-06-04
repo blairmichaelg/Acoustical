@@ -1,0 +1,5 @@
+# Dummy audio file for plugin testing
+# Duration: 2.0s
+# Format: Text (simulated audio)
+#
+# Used for testing plugin registration and execution
