@@ -126,13 +126,14 @@ def get_shapes_for_chord(root_note_str: str, chord_type: str) -> List[ChordShape
     including transposed movable shapes.
     """
     normalized_type = chord_type.lower()
-    if normalized_type in ["minor", "mi"]:
+    if normalized_type in ["minor", "mi", "m"]: # Added "m"
         normalized_type = "min"
     elif normalized_type in ["major", ""]:
         normalized_type = "maj"
     elif normalized_type in ["dominant7", "dom7"]:
         normalized_type = "7"
     # Other types like "maj7", "m7" will be used as is if they are keys in COMMON_CHORD_SHAPE_TEMPLATES
+    # For example, if chord_type is "maj7", normalized_type remains "maj7" and directly used.
 
     shapes = []
     type_specific_templates = COMMON_CHORD_SHAPE_TEMPLATES.get(normalized_type, [])
