@@ -142,6 +142,12 @@ def get_chord_type_from_intervals(root_value: int, note_values: List[int]) -> Op
             # Return the exact type_name from CHORD_FORMULAS.
             # Downstream functions will handle any necessary normalization.
             return type_name
+    
+    # Explicit fallback for basic major/minor if not caught by sorted list (e.g. if alias like "m" was primary key)
+    if set(intervals_from_root) == set(CHORD_FORMULAS.get("maj", [])):
+        return "maj"
+    if set(intervals_from_root) == set(CHORD_FORMULAS.get("min", [])) or set(intervals_from_root) == set(CHORD_FORMULAS.get("m",[])):
+        return "min"
             
     log.warning(f"Could not determine chord type for intervals: {intervals_from_root} from root_value {root_value}")
     return None
