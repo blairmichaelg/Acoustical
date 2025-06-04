@@ -195,7 +195,7 @@ Suggest three chord substitutions or extensions that fit mood.
 
 ## License
 
-This project is licensed under the TODO-REPLACE-WITH-LICENSE-TYPE license.
+This project is licensed under the MIT license.
 See the [LICENSE](LICENSE) file for details.
 
 ## Contact
