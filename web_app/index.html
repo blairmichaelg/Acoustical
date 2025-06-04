@@ -12,6 +12,28 @@
     pre { background: #f4f4f4; padding: 1em; border-radius: 4px; }
     a.bug-link { color: #b30000; text-decoration: underline; }
     button:focus, input:focus { outline: 2px solid #0078d7; }
+    .lyrics-container {
+      white-space: pre-wrap; /* Preserve whitespace and wrap text */
+      font-family: monospace;
+      background: #f9f9f9;
+      padding: 1em;
+      border-radius: 4px;
+      border: 1px solid #eee;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .lyrics-line {
+      margin-bottom: 0.5em;
+    }
+    .lyrics-line .chord {
+      font-weight: bold;
+      color: #0078d7;
+      margin-right: 0.5em;
+    }
+    .structure-item {
+      font-weight: bold;
+      margin-bottom: 0.5em;
+    }
   </style>
 </head>
 <body>
@@ -41,6 +63,14 @@
     <div id="extract-loading" style="display:none;color:#888;">Extracting...</div>
     <pre id="extract-result" aria-live="polite" tabindex="9"></pre>
     <div id="chord-chart" style="margin-top:1em;"></div>
+    <div id="aligned-lyrics-container" class="lyrics-container" style="margin-top:1em; display:none;">
+      <h3>Aligned Lyrics:</h3>
+      <div id="aligned-lyrics-content"></div>
+    </div>
+    <div id="song-structure-container" style="margin-top:1em; display:none;">
+      <h3>Song Structure:</h3>
+      <ul id="song-structure-content"></ul>
+    </div>
   </div>
   <div class="section">
     <h2>2. Transpose Chords</h2>
@@ -146,6 +176,9 @@
       document.getElementById('extract-loading').style.display = '';
       document.getElementById('extract-result').textContent = '';
       document.getElementById('chord-chart').innerHTML = '';
+      document.getElementById('aligned-lyrics-container').style.display = 'none';
+      document.getElementById('song-structure-container').style.display = 'none';
+
       const form = e.target;
       const audioFile = form.querySelector('input[name="audio"]').files[0];
       const audioUrl = document.getElementById('extract-audio-url').value.trim();
@@ -170,19 +203,29 @@
       try {
         const headers = audioUrl ? { 'Content-Type': 'application/json' } : {};
         const res = await fetch(url, { method: 'POST', headers: headers, body: payload });
-        const text = await res.text();
-        document.getElementById('extract-result').textContent = text;
+        const data = await res.json(); // Parse as JSON directly
+        
         if (res.ok) {
-          try {
-            const json = JSON.parse(text);
-            if (json.chords) {
-              renderChordChart(json.chords, 'chord-chart');
-            }
-          } catch {}
+          if (data.chords) {
+            renderChordChart(data.chords, 'chord-chart');
+          }
+          if (data.aligned_lyrics && data.aligned_lyrics.length > 0) {
+            renderAlignedLyrics(data.aligned_lyrics, 'aligned-lyrics-content');
+            document.getElementById('aligned-lyrics-container').style.display = 'block';
+          }
+          if (data.song_structure && data.song_structure.structure && data.song_structure.structure.length > 0) {
+            renderSongStructure(data.song_structure.structure, 'song-structure-content');
+            document.getElementById('song-structure-container').style.display = 'block';
+          }
+          document.getElementById('extract-result').textContent = JSON.stringify(data, null, 2); // Display full JSON response
           document.getElementById('extract-result').style.color = '';
         } else {
+          document.getElementById('extract-result').textContent = data.error || 'Extraction failed.';
           document.getElementById('extract-result').style.color = '#b30000';
         }
+      } catch (e) {
+        document.getElementById('extract-result').textContent = 'Error: ' + e.message;
+        document.getElementById('extract-result').style.color = '#b30000';
       } finally {
         document.getElementById('extract-loading').style.display = 'none';
       }
@@ -191,6 +234,8 @@
       document.getElementById('extract-result').textContent = '';
       document.getElementById('extract-result').style.color = '';
       document.getElementById('chord-chart').innerHTML = '';
+      document.getElementById('aligned-lyrics-container').style.display = 'none';
+      document.getElementById('song-structure-container').style.display = 'none';
       document.getElementById('extract-audio-url').value = ''; // Clear URL field
       document.querySelector('#extract-form input[name="audio"]').value = ''; // Clear file input
     };
@@ -327,6 +372,48 @@
       container.innerHTML = '<b>Chord Chart:</b><br>';
       container.appendChild(chart);
     }
+
+    function renderAlignedLyrics(alignedLyrics, targetId) {
+      const container = document.getElementById(targetId);
+      container.innerHTML = ''; // Clear previous content
+      if (!Array.isArray(alignedLyrics) || alignedLyrics.length === 0) {
+        container.textContent = 'No aligned lyrics available.';
+        return;
+      }
+
+      alignedLyrics.forEach(item => {
+        const lineDiv = document.createElement('div');
+        lineDiv.classList.add('lyrics-line');
+        
+        if (item.chords && item.chords.length > 0) {
+          const chordSpan = document.createElement('span');
+          chordSpan.classList.add('chord');
+          // Display the first chord of the line, or a summary
+          chordSpan.textContent = `[${item.chords[0].chord}] `; 
+          lineDiv.appendChild(chordSpan);
+        }
+        
+        lineDiv.appendChild(document.createTextNode(item.line));
+        container.appendChild(lineDiv);
+      });
+    }
+
+    function renderSongStructure(structure, targetId) {
+      const container = document.getElementById(targetId);
+      container.innerHTML = ''; // Clear previous content
+      if (!Array.isArray(structure) || structure.length === 0) {
+        container.textContent = 'No song structure available.';
+        return;
+      }
+
+      structure.forEach(item => {
+        const listItem = document.createElement('li');
+        listItem.classList.add('structure-item');
+        listItem.textContent = `${item.type} (starts at ${item.start_time.toFixed(1)}s)`;
+        container.appendChild(listItem);
+      });
+    }
+
     // Backend Status
     document.getElementById('backend-status-btn').onclick = async function() {
       document.getElementById('backend-status-loading').style.display = '';

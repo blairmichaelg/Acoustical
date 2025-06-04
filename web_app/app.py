@@ -14,7 +14,8 @@ from flourish_engine.rule_based import apply_rule_based_flourishes
 from key_transpose_capo.key_analysis import detect_key_from_chords
 from audio_input.utils import check_audio_file
 from common.utils import format_error, serialize_result
-from lyrics_analysis.lyrics_retriever import get_lyrics as get_lyrics_func # Import the new lyrics function
+from lyrics_analysis.lyrics_retriever import get_lyrics as get_lyrics_func
+from lyrics_analysis.lyrics_analyzer import align_chords_with_lyrics, identify_song_structure
 
 app = Flask(__name__)
 log = logging.getLogger(__name__)
@@ -28,44 +29,94 @@ def index() -> Response:
     """Serves the main index.html file."""
     return send_from_directory(os.path.dirname(__file__), "index.html")
 
-@app.route("/extract_chords", methods=["POST"])
-def extract_chords_route() -> Tuple[Response, int]:
+def process_chord_extraction(audio_input_source: Optional[str], is_url: bool) -> Tuple[Dict[str, Any], int]:
     """
-    Handles single audio file upload and chord extraction.
+    Helper function to handle chord extraction logic for both file uploads and URLs.
+    Also attempts to retrieve lyrics and perform basic alignment/structure analysis.
     """
-    log.info("Received request for /extract_chords")
-    if 'audio' not in request.files:
-        log.warning("No audio file uploaded in /extract_chords request")
-        return jsonify(format_error("No audio file uploaded.")), 400
-
-    audio = request.files['audio']
-    filename = secure_filename(audio.filename)
-    if not filename:
-        log.warning("Invalid filename received in /extract_chords request")
-        return jsonify(format_error("Invalid filename.")), 400
-
-    temp_dir = tempfile.mkdtemp()
-    temp_filepath = os.path.join(temp_dir, filename)
-
+    temp_dir = None
+    temp_filepath = None
+    chords = []
+    lyrics_text = ""
+    
     try:
-        audio.save(temp_filepath)
-        check_audio_file(temp_filepath)
-        chords = get_chords(temp_filepath)
-        log.info(f"Successfully extracted chords from {filename}")
-        return jsonify({"chords": chords}), 200
+        if is_url:
+            # get_chords now handles downloading from URL to a temp file internally
+            chords = get_chords(audio_input_source)
+            log.info(f"Successfully extracted chords from URL: {audio_input_source}")
+            
+            # Attempt to get lyrics for the URL
+            lyrics_result = get_lyrics_func(url=audio_input_source)
+            if "lyrics" in lyrics_result:
+                lyrics_text = lyrics_result["lyrics"]
+                log.info(f"Successfully retrieved lyrics for URL: {audio_input_source}")
+            elif "error" in lyrics_result:
+                log.warning(f"Could not retrieve lyrics for URL {audio_input_source}: {lyrics_result['error']}")
+        else:
+            # For file uploads, save to temp and then process
+            audio = request.files['audio']
+            filename = secure_filename(audio.filename)
+            if not filename:
+                log.warning("Invalid filename received")
+                return jsonify(format_error("Invalid filename.")), 400
+
+            temp_dir = tempfile.mkdtemp()
+            temp_filepath = os.path.join(temp_dir, filename)
+            audio.save(temp_filepath)
+            check_audio_file(temp_filepath)
+            chords = get_chords(temp_filepath)
+            log.info(f"Successfully extracted chords from {filename}")
+        
+        aligned_lyrics = []
+        song_structure = {"structure": []}
+
+        if lyrics_text: # Only align and identify structure if lyrics were successfully retrieved
+            aligned_lyrics = align_chords_with_lyrics(chords, lyrics_text)
+            song_structure = identify_song_structure(lyrics_text, chords)
+
+        return jsonify({
+            "chords": chords,
+            "lyrics": lyrics_text, # Return the actual lyrics text
+            "aligned_lyrics": aligned_lyrics,
+            "song_structure": song_structure
+        }), 200
     except ValueError as e:
-        log.error(f"File validation failed for {filename}: {e}")
+        log.error(f"File validation failed: {e}")
         return jsonify(format_error(f"Invalid file: {e}")), 400
     except Exception as e:
-        log.error(f"Chord extraction failed for {filename}", exc_info=True)
+        log.error(f"Chord extraction failed for {audio_input_source}", exc_info=True)
         return jsonify(format_error("Chord extraction failed", e)), 500
     finally:
-        if os.path.exists(temp_dir):
+        if temp_dir and os.path.exists(temp_dir):
             try:
                 shutil.rmtree(temp_dir)
                 log.debug(f"Cleaned up temporary directory: {temp_dir}")
             except Exception as e:
                 log.error(f"Failed to clean up temporary directory {temp_dir}: {e}")
+
+@app.route("/extract_chords", methods=["POST"])
+def extract_chords_route() -> Tuple[Response, int]:
+    """
+    Handles single audio file upload and chord extraction.
+    """
+    log.info("Received request for /extract_chords (file upload)")
+    if 'audio' not in request.files:
+        log.warning("No audio file uploaded in /extract_chords request")
+        return jsonify(format_error("No audio file uploaded.")), 400
+    return process_chord_extraction(None, False) # Pass None for source, indicate it's a file upload
+
+@app.route("/extract_chords_from_url", methods=["POST"])
+def extract_chords_from_url_route() -> Tuple[Response, int]:
+    """
+    Handles chord extraction from a URL.
+    """
+    log.info("Received request for /extract_chords_from_url")
+    data = request.get_json()
+    url = data.get('url')
+    if not url:
+        log.warning("No URL provided for /extract_chords_from_url request")
+        return jsonify(format_error("No URL provided.")), 400
+    return process_chord_extraction(url, True) # Pass URL, indicate it's a URL
 
 @app.route("/extract_chords_batch", methods=["POST"])
 def extract_chords_batch_route() -> Tuple[Response, int]:
@@ -315,27 +366,6 @@ def download_audio_route() -> Tuple[Response, int]:
         log.error(f"Audio download failed for URL {url}", exc_info=True)
         return jsonify(format_error("Audio download failed", e)), 500
 
-@app.route("/extract_chords_from_url", methods=["POST"])
-def extract_chords_from_url_route() -> Tuple[Response, int]:
-    """
-    Handles chord extraction from a URL.
-    """
-    log.info("Received request for /extract_chords_from_url")
-    # For URL input, we expect JSON body, not form data
-    data = request.get_json()
-    url = data.get('url')
-    if not url:
-        log.warning("No URL provided for /extract_chords_from_url request")
-        return jsonify(format_error("No URL provided.")), 400
-
-    try:
-        chords = get_chords(url) # get_chords now handles URL internally
-        log.info(f"Successfully extracted chords from URL: {url}")
-        return jsonify({"chords": chords}), 200
-    except Exception as e:
-        log.error(f"Chord extraction from URL failed for {url}", exc_info=True)
-        return jsonify(format_error("Chord extraction from URL failed", e)), 500
-
 @app.route("/get_lyrics", methods=["POST"])
 def get_lyrics_route() -> Tuple[Response, int]:
     """
@@ -353,7 +383,7 @@ def get_lyrics_route() -> Tuple[Response, int]:
         log.warning("Missing URL or title/artist in /get_lyrics request")
         return jsonify(format_error("Missing URL or song title/artist.")), 400
 
-    lyrics_data = get_lyrics_func(url=url, title=title, artist=artist) # Use the imported function
+    lyrics_data = get_lyrics_func(url=url, title=title, artist=artist)
 
     if "error" in lyrics_data:
         log.error(f"Lyrics retrieval failed: {lyrics_data['error']}")
