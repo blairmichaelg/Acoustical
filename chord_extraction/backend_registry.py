@@ -30,8 +30,25 @@ def register_plugin_backend(
 
 def register_backend(cls):
     """Class decorator to register a ChordExtractionBackend implementation."""
-    _registered_plugins.append(cls.extract_chords)
+    # Store the class itself, or its extract_chords method. Storing class allows access to .name
+    # For now, let's assume we want to register the extract_chords method as before.
+    # A more robust registry might store (name, class) or (name, method).
+    if hasattr(cls, 'extract_chords') and callable(cls.extract_chords):
+        if cls.extract_chords not in _registered_plugins: # Avoid duplicates
+            _registered_plugins.append(cls.extract_chords)
     return cls
+
+def unregister_backend_by_method(method_to_remove: Callable) -> None:
+    """Unregister a backend by its extract_chords method."""
+    try:
+        _registered_plugins.remove(method_to_remove)
+    except ValueError:
+        # Method not found, already unregistered, or never registered
+        pass
+
+def get_registered_plugins() -> List[Callable]:
+    """Return a copy of the list of registered plugin methods."""
+    return list(_registered_plugins)
 
 
 def extract_chords_with_fallback(audio_path: str) -> List[Dict[str, Any]]:

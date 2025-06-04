@@ -11,6 +11,8 @@ try:
 except ImportError:
     guess_chords = None
 
+log = logging.getLogger(__name__) # Module-level logger
+
 class AutochordBackend(ChordExtractionBackend):
     name = "autochord"
 
@@ -20,17 +22,16 @@ class AutochordBackend(ChordExtractionBackend):
 
     @classmethod
     def extract_chords(cls, audio_path: str) -> List[Dict[str, Union[float, str]]]:
-        logger = logging.getLogger("chord_extraction.autochord_util")
         if not cls.is_available():
-            logger.error("autochord is not installed. Please install with 'pip install autochord'.")
+            log.error("autochord is not installed. Please install with 'pip install autochord'.")
             raise ImportError("autochord is not installed. Please install with 'pip install autochord'.")
         try:
-            logger.info(f"Extracting chords from {audio_path} using autochord.")
+            log.info(f"Extracting chords from {audio_path} using autochord.")
             chords = guess_chords(audio_path)
             # autochord returns a list of (time, chord) tuples
             return [{"time": float(t), "chord": str(c)} for t, c in chords]
         except Exception as e:
-            logger.error(f"autochord extraction failed: {e}")
+            log.error(f"autochord extraction failed: {e}")
             raise RuntimeError("autochord extraction failed") from e
 
 # Register backend on import
