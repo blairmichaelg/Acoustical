@@ -1,5 +1,6 @@
 import logging
-from typing import List, Dict, Any # Removed Tuple as it's not directly used
+from typing import List, Dict, Any  # Removed Tuple as it's not directly used
+import difflib
 
 log = logging.getLogger(__name__)
 
@@ -38,7 +39,7 @@ def align_chords_with_lyrics(
         # Fallback if no time info in chords, assume 5 seconds per line
         total_duration = len(lines) * 5.0
 
-    time_per_line = total_duration / len(lines)
+    time_per_line = total_duration / len(lines) if len(lines) > 0 else 0.0
     current_chord_index = 0
 
     for i, line_data in enumerate(aligned_data):
@@ -100,6 +101,7 @@ def identify_song_structure(
     }
 
     section_counter = {"verse": 0, "chorus": 0, "bridge": 0}
+    potential_sections = {}
 
     for i, line in enumerate(lines):
         line_lower = line.lower()
@@ -111,36 +113,36 @@ def identify_song_structure(
                 break
 
         if detected_type:
-            if detected_type == "verse":
-                section_counter["verse"] += 1
-                section_name = f"Verse {section_counter['verse']}"
-            elif detected_type == "chorus":
-                section_counter["chorus"] += 1
-                section_name = f"Chorus {section_counter['chorus']}"
-            elif detected_type == "bridge":
-                section_counter["bridge"] += 1
-                section_name = f"Bridge {section_counter['bridge']}"
-            else:
-                section_name = detected_type.capitalize()
+            if detected_type not in potential_sections:
+                potential_sections[detected_type] = []
+            potential_sections[detected_type].append(i)
 
-            # Only add if it's a new section type or a new numbered verse/chorus/bridge
-            if not structure or \
-               (section_name != structure[-1]["type"] and
-                detected_type not in ["verse", "chorus", "bridge"]) or \
-               (detected_type in ["verse", "chorus", "bridge"] and
-                section_name != structure[-1]["type"]):
+    # Analyze potential sections for repetition
+    for section_type, line_indices in potential_sections.items():
+        # For simplicity, just take the first occurrence for now
+        # A more sophisticated approach would analyze repetition and similarity
+        if section_type == "verse":
+            section_counter["verse"] += 1
+            section_name = f"Verse {section_counter['verse']}"
+        elif section_type == "chorus":
+            section_counter["chorus"] += 1
+            section_name = f"Chorus {section_counter['chorus']}"
+        elif section_type == "bridge":
+            section_counter["bridge"] += 1
+            section_name = f"Bridge {section_counter['bridge']}"
+        else:
+            section_name = section_type.capitalize()
 
-                # Find the closest chord time for the start of this section
-                section_start_time = i * time_per_line
-                closest_chord_time = section_start_time
-                if chords:
-                    # Find the first chord that is at or after the estimated line start time
-                    for chord_entry in chords:
-                        if chord_entry.get("time", 0.0) >= section_start_time:
-                            closest_chord_time = chord_entry.get("time", section_start_time)
-                            break
+        section_start_time = line_indices[0] * time_per_line
+        closest_chord_time = section_start_time
+        if chords:
+            # Find the first chord that is at or after the estimated line start time
+            for chord_entry in chords:
+                if chord_entry.get("time", 0.0) >= section_start_time:
+                    closest_chord_time = chord_entry.get("time", section_start_time)
+                    break
 
-                structure.append({"type": section_name, "start_time": closest_chord_time})
+        structure.append({"type": section_name, "start_time": closest_chord_time})
 
     if not structure and lines:  # Fallback if no structure found
         structure.append({"type": "Song", "start_time": 0.0})
