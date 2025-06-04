@@ -1,6 +1,6 @@
 import logging
 import re
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Optional, Tuple # Removed Dict, Any
 
 from music_theory import utils as music_theory_utils
 from music_theory.fretboard import Fretboard
@@ -69,8 +69,8 @@ def score_shape_playability(shape: ChordShape, fretboard: Fretboard) -> int:
 
 def suggest_fingerings(
     chord_str: str,
-    fretboard: Optional[Fretboard] = None,
-    context: Optional[Dict[str, Any]] = None
+    fretboard: Optional[Fretboard] = None
+    # context: Optional[Dict[str, Any]] = None # Parameter removed
 ) -> List[ChordShape]:
     log.info(f"Suggesting fingerings for chord: {chord_str}")
     if fretboard is None:

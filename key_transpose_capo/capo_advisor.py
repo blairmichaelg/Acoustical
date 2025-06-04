@@ -2,6 +2,10 @@
 Capo advisor: recommends capo fret based on chord complexity heuristics.
 """
 from typing import List, Tuple
+import logging
+from music_theory import utils as mtu # Added import
+
+log = logging.getLogger(__name__)
 
 def recommend_capo(chords: List[str]) -> Tuple[int, List[str]]:
     """
@@ -43,20 +47,33 @@ def recommend_capo(chords: List[str]) -> Tuple[int, List[str]]:
         possible_to_transpose_all = True
         for original_chord_str in chords:
             try:
-                cs = harmony.ChordSymbol(original_chord_str)
+                # Use our more robust parser first to get notes
+                parsed_notes = mtu.parse_chord_to_notes(original_chord_str)
+                if not parsed_notes or (len(parsed_notes) == 1 and parsed_notes[0] == original_chord_str):
+                    # If our parser fails, let music21 try, or raise error
+                    log.warning(f"mtu.parse_chord_to_notes failed for '{original_chord_str}', trying direct music21 parse.")
+                    cs = harmony.ChordSymbol(original_chord_str) # music21's direct attempt
+                else:
+                    # Construct music21 chord from our parsed notes for reliable transposition
+                    cs = harmony.ChordSymbol(notes=parsed_notes)
+
                 # To find playable shapes with capo at fret_to_try_capo,
                 # transpose the sounding chord DOWN by that many semitones.
                 transposed_shape_cs = cs.transpose(-fret_to_try_capo)
                 shape_name = transposed_shape_cs.figure # Use .figure for standard notation
                 current_transposed_shapes.append(shape_name)
-                if shape_name not in open_chords:
+                
+                # For scoring against open_chords, ignore slash part if present
+                score_shape_name = shape_name.split('/')[0]
+                if score_shape_name not in open_chords:
                     current_score += 1
             except Exception as e:
                 # If a chord can't be parsed/transposed, this capo position is problematic.
                 # Option 1: Skip this fret entirely.
                 # Option 2: Penalize heavily or mark as invalid.
                 # Current choice: Skip this fret by breaking and not updating best_score.
-                # log.warning(f"Error processing chord '{original_chord_str}' for capo {fret_to_try_capo}: {e}")
+                # log is now defined at module level
+                log.warning(f"Error processing chord '{original_chord_str}' for capo {fret_to_try_capo}: {e}", exc_info=False) # Log simple error
                 possible_to_transpose_all = False
                 break # Move to next fret if any chord fails for this capo position
         
