@@ -1,7 +1,7 @@
 import os
 import tempfile
 import logging
-import shutil  # Import shutil for rmtree
+import shutil
 from typing import Dict, Any, List, Tuple, Optional
 
 from flask import Flask, request, jsonify, send_from_directory, Response
@@ -14,13 +14,14 @@ from flourish_engine.rule_based import apply_rule_based_flourishes
 from key_transpose_capo.key_analysis import detect_key_from_chords
 from audio_input.utils import check_audio_file
 from common.utils import format_error, serialize_result
+from lyrics_analysis.lyrics_retriever import get_lyrics as get_lyrics_func # Import the new lyrics function
 
 app = Flask(__name__)
 log = logging.getLogger(__name__)
 
 # Security: Limit upload size (e.g., 20MB)
 app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024
-ALLOWED_EXTENSIONS = {'.mp3', '.wav', '.flac'}  # Consider getting this from config.py
+ALLOWED_EXTENSIONS = {'.mp3', '.wav', '.flac'}
 
 @app.route("/")
 def index() -> Response:
@@ -320,7 +321,9 @@ def extract_chords_from_url_route() -> Tuple[Response, int]:
     Handles chord extraction from a URL.
     """
     log.info("Received request for /extract_chords_from_url")
-    url = request.form.get('url')
+    # For URL input, we expect JSON body, not form data
+    data = request.get_json()
+    url = data.get('url')
     if not url:
         log.warning("No URL provided for /extract_chords_from_url request")
         return jsonify(format_error("No URL provided.")), 400
@@ -350,16 +353,14 @@ def get_lyrics_route() -> Tuple[Response, int]:
         log.warning("Missing URL or title/artist in /get_lyrics request")
         return jsonify(format_error("Missing URL or song title/artist.")), 400
 
-    # Placeholder for actual lyrics fetching logic
-    # In a real scenario, this would integrate with a lyrics API or web scraper.
-    lyrics = ""
-    if url:
-        lyrics = f"Lyrics for song from URL: {url}\n\n(Placeholder lyrics: Verse 1... Chorus... Verse 2...)"
-    elif title and artist:
-        lyrics = f"Lyrics for '{title}' by {artist}\n\n(Placeholder lyrics: Verse 1... Chorus... Verse 2...)"
+    lyrics_data = get_lyrics_func(url=url, title=title, artist=artist) # Use the imported function
 
-    log.info("Lyrics retrieval successful (placeholder)")
-    return jsonify({"lyrics": lyrics}), 200
+    if "error" in lyrics_data:
+        log.error(f"Lyrics retrieval failed: {lyrics_data['error']}")
+        return jsonify(format_error(lyrics_data['error'])), 500
+    
+    log.info("Lyrics retrieval successful")
+    return jsonify({"lyrics": lyrics_data.get("lyrics", "")}), 200
 
 
 if __name__ == "__main__":
