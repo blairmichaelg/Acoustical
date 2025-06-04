@@ -2,7 +2,7 @@ import os
 import tempfile
 import logging
 import shutil
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Dict, Any, Tuple, Optional
 
 from flask import Flask, request, jsonify, send_from_directory, Response
 from werkzeug.utils import secure_filename
@@ -13,7 +13,8 @@ from key_transpose_capo.capo_advisor import recommend_capo
 from flourish_engine.rule_based import apply_rule_based_flourishes
 from key_transpose_capo.key_analysis import detect_key_from_chords
 from audio_input.utils import check_audio_file
-from common.utils import format_error, serialize_result
+from common.utils import format_error
+
 from lyrics_analysis.lyrics_retriever import get_lyrics as get_lyrics_func
 from lyrics_analysis.lyrics_analyzer import align_chords_with_lyrics, identify_song_structure
 
@@ -24,12 +25,16 @@ log = logging.getLogger(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024
 ALLOWED_EXTENSIONS = {'.mp3', '.wav', '.flac'}
 
+
 @app.route("/")
 def index() -> Response:
     """Serves the main index.html file."""
     return send_from_directory(os.path.dirname(__file__), "index.html")
 
-def process_chord_extraction(audio_input_source: Optional[str], is_url: bool) -> Tuple[Dict[str, Any], int]:
+
+def process_chord_extraction(
+    audio_input_source: Optional[str], is_url: bool
+) -> Tuple[Dict[str, Any], int]:
     """
     Helper function to handle chord extraction logic for both file uploads and URLs.
     Also attempts to retrieve lyrics and perform basic alignment/structure analysis.
@@ -38,20 +43,23 @@ def process_chord_extraction(audio_input_source: Optional[str], is_url: bool) ->
     temp_filepath = None
     chords = []
     lyrics_text = ""
-    
+
     try:
         if is_url:
             # get_chords now handles downloading from URL to a temp file internally
             chords = get_chords(audio_input_source)
             log.info(f"Successfully extracted chords from URL: {audio_input_source}")
-            
+
             # Attempt to get lyrics for the URL
             lyrics_result = get_lyrics_func(url=audio_input_source)
             if "lyrics" in lyrics_result:
                 lyrics_text = lyrics_result["lyrics"]
                 log.info(f"Successfully retrieved lyrics for URL: {audio_input_source}")
             elif "error" in lyrics_result:
-                log.warning(f"Could not retrieve lyrics for URL {audio_input_source}: {lyrics_result['error']}")
+                log.warning(
+                    f"Could not retrieve lyrics for URL {audio_input_source}: "
+                    f"{lyrics_result['error']}"
+                )
         else:
             # For file uploads, save to temp and then process
             audio = request.files['audio']
@@ -66,17 +74,17 @@ def process_chord_extraction(audio_input_source: Optional[str], is_url: bool) ->
             check_audio_file(temp_filepath)
             chords = get_chords(temp_filepath)
             log.info(f"Successfully extracted chords from {filename}")
-        
+
         aligned_lyrics = []
         song_structure = {"structure": []}
 
-        if lyrics_text: # Only align and identify structure if lyrics were successfully retrieved
+        if lyrics_text:  # Only align and identify structure if lyrics were successfully retrieved
             aligned_lyrics = align_chords_with_lyrics(chords, lyrics_text)
             song_structure = identify_song_structure(lyrics_text, chords)
 
         return jsonify({
             "chords": chords,
-            "lyrics": lyrics_text, # Return the actual lyrics text
+            "lyrics": lyrics_text,  # Return the actual lyrics text
             "aligned_lyrics": aligned_lyrics,
             "song_structure": song_structure
         }), 200
@@ -94,6 +102,7 @@ def process_chord_extraction(audio_input_source: Optional[str], is_url: bool) ->
             except Exception as e:
                 log.error(f"Failed to clean up temporary directory {temp_dir}: {e}")
 
+
 @app.route("/extract_chords", methods=["POST"])
 def extract_chords_route() -> Tuple[Response, int]:
     """
@@ -103,7 +112,8 @@ def extract_chords_route() -> Tuple[Response, int]:
     if 'audio' not in request.files:
         log.warning("No audio file uploaded in /extract_chords request")
         return jsonify(format_error("No audio file uploaded.")), 400
-    return process_chord_extraction(None, False) # Pass None for source, indicate it's a file upload
+    return process_chord_extraction(None, False)  # Pass None for source, indicate it's a file upload
+
 
 @app.route("/extract_chords_from_url", methods=["POST"])
 def extract_chords_from_url_route() -> Tuple[Response, int]:
@@ -116,7 +126,8 @@ def extract_chords_from_url_route() -> Tuple[Response, int]:
     if not url:
         log.warning("No URL provided for /extract_chords_from_url request")
         return jsonify(format_error("No URL provided.")), 400
-    return process_chord_extraction(url, True) # Pass URL, indicate it's a URL
+    return process_chord_extraction(url, True)  # Pass URL, indicate it's a URL
+
 
 @app.route("/extract_chords_batch", methods=["POST"])
 def extract_chords_batch_route() -> Tuple[Response, int]:
@@ -126,7 +137,9 @@ def extract_chords_batch_route() -> Tuple[Response, int]:
     log.info("Received request for /extract_chords_batch")
     if 'audios' not in request.files:
         log.warning("No audio files uploaded in /extract_chords_batch request")
-        return jsonify(format_error("No audio files uploaded. Use 'audios' as the field name.")), 400
+        return jsonify(
+            format_error("No audio files uploaded. Use 'audios' as the field name.")
+        ), 400
 
     files = request.files.getlist('audios')
     if not files:
@@ -171,7 +184,10 @@ def extract_chords_batch_route() -> Tuple[Response, int]:
     try:
         batch_result = get_chords_batch(temp_paths)
         # Map temp file paths back to original filenames
-        result = {file_map[path]: batch_result.get(path, {"error": "Processing failed"}) for path in temp_paths}
+        result = {
+            file_map[path]: batch_result.get(path, {"error": "Processing failed"})
+            for path in temp_paths
+        }
         log.info("Batch chord extraction complete")
         return jsonify(result), 200
     except Exception as e:
@@ -184,6 +200,7 @@ def extract_chords_batch_route() -> Tuple[Response, int]:
                 log.debug(f"Cleaned up temporary directory: {temp_dir}")
             except Exception as e:
                 log.error(f"Failed to clean up temporary directory {temp_dir}: {e}")
+
 
 @app.route("/transpose", methods=["POST"])
 def transpose_route() -> Tuple[Response, int]:
@@ -198,13 +215,17 @@ def transpose_route() -> Tuple[Response, int]:
 
     try:
         chords = data['chords']
-        semitones = int(data['semitones'])
-        if not isinstance(chords, list) or not all(isinstance(c, dict) and 'chord' in c for c in chords):
+        semitones_val = int(data['semitones'])  # Renamed to avoid conflict
+        if not isinstance(chords, list) or not all(
+            isinstance(c, dict) and 'chord' in c for c in chords
+        ):
             log.warning("Invalid chords format in /transpose request")
-            return jsonify(format_error("Invalid chords format. Expected list of objects with 'chord' key.")), 400
+            return jsonify(
+                format_error("Invalid chords format. Expected list of objects with 'chord' key.")
+            ), 400
 
         chord_strings = [c['chord'] for c in chords]
-        transposed_strings = transpose_chords(chord_strings, semitones)
+        transposed_strings = transpose_chords(chord_strings, semitones_val)
 
         transposed_chords = []
         for i, c in enumerate(chords):
@@ -221,6 +242,7 @@ def transpose_route() -> Tuple[Response, int]:
         log.error("Transposition failed", exc_info=True)
         return jsonify(format_error("Transposition failed", e)), 500
 
+
 @app.route("/capo", methods=["POST"])
 def capo_route() -> Tuple[Response, int]:
     """
@@ -234,9 +256,13 @@ def capo_route() -> Tuple[Response, int]:
 
     try:
         chords = data['chords']
-        if not isinstance(chords, list) or not all(isinstance(c, dict) and 'chord' in c for c in chords):
+        if not isinstance(chords, list) or not all(
+            isinstance(c, dict) and 'chord' in c for c in chords
+        ):
             log.warning("Invalid chords format in /capo request")
-            return jsonify(format_error("Invalid chords format. Expected list of objects with 'chord' key.")), 400
+            return jsonify(
+                format_error("Invalid chords format. Expected list of objects with 'chord' key.")
+            ), 400
 
         chord_strings = [c['chord'] for c in chords]
         capo_fret, transposed_strings = recommend_capo(chord_strings)
@@ -252,6 +278,7 @@ def capo_route() -> Tuple[Response, int]:
     except Exception as e:
         log.error("Capo recommendation failed", exc_info=True)
         return jsonify(format_error("Capo recommendation failed", e)), 500
+
 
 @app.route("/flourish", methods=["POST"])
 def flourish_route() -> Tuple[Response, int]:
@@ -269,9 +296,13 @@ def flourish_route() -> Tuple[Response, int]:
 
     try:
         chords = data['chords']
-        if not isinstance(chords, list) or not all(isinstance(c, dict) and 'chord' in c for c in chords):
+        if not isinstance(chords, list) or not all(
+            isinstance(c, dict) and 'chord' in c for c in chords
+        ):
             log.warning("Invalid chords format in /flourish request")
-            return jsonify(format_error("Invalid chords format. Expected list of objects with 'chord' key.")), 400
+            return jsonify(
+                format_error("Invalid chords format. Expected list of objects with 'chord' key.")
+            ), 400
 
         chord_list = [c['chord'] for c in chords]
         flourishes = []
@@ -290,7 +321,12 @@ def flourish_route() -> Tuple[Response, int]:
             log.info(f"Rule-based flourish generation requested with rule set: {rule_set_name}")
         else:
             log.warning(f"Invalid flourish method requested: {method}")
-            return jsonify(format_error(f"Invalid flourish method: {method}. Available methods: rule_based, magenta, gpt4all.")), 400
+            return jsonify(
+                format_error(
+                    f"Invalid flourish method: {method}. Available methods: "
+                    "rule_based, magenta, gpt4all."
+                )
+            ), 400
 
         return jsonify({"flourishes": flourishes}), 200
     except ValueError as e:
@@ -299,6 +335,7 @@ def flourish_route() -> Tuple[Response, int]:
     except Exception as e:
         log.error("Flourish suggestion failed", exc_info=True)
         return jsonify(format_error("Flourish suggestion failed", e)), 500
+
 
 @app.route("/key", methods=["POST"])
 def key_route() -> Tuple[Response, int]:
@@ -313,9 +350,13 @@ def key_route() -> Tuple[Response, int]:
 
     try:
         chords = data['chords']
-        if not isinstance(chords, list) or not all(isinstance(c, dict) and 'chord' in c for c in chords):
+        if not isinstance(chords, list) or not all(
+            isinstance(c, dict) and 'chord' in c for c in chords
+        ):
             log.warning("Invalid chords format in /key request")
-            return jsonify(format_error("Invalid chords format. Expected list of objects with 'chord' key.")), 400
+            return jsonify(
+                format_error("Invalid chords format. Expected list of objects with 'chord' key.")
+            ), 400
 
         chord_strings = [c['chord'] for c in chords]
         key = detect_key_from_chords(chord_strings)
@@ -324,6 +365,7 @@ def key_route() -> Tuple[Response, int]:
     except Exception as e:
         log.error("Key detection failed", exc_info=True)
         return jsonify(format_error("Key detection failed", e)), 500
+
 
 @app.route("/backend_status", methods=["GET"])
 def backend_status() -> Tuple[Response, int]:
@@ -338,6 +380,7 @@ def backend_status() -> Tuple[Response, int]:
     except Exception as e:
         log.error("Backend status check failed", exc_info=True)
         return jsonify(format_error("Backend status check failed", e)), 500
+
 
 @app.route("/download_audio", methods=["POST"])
 def download_audio_route() -> Tuple[Response, int]:
@@ -361,10 +404,13 @@ def download_audio_route() -> Tuple[Response, int]:
         return jsonify({"success": True, "filename": filename, "path": path}), 200
     except ImportError:
         log.error("yt-dlp not installed for audio download")
-        return jsonify(format_error("Audio download requires yt-dlp. Install with 'pip install yt-dlp'.")), 500
+        return jsonify(
+            format_error("Audio download requires yt-dlp. Install with 'pip install yt-dlp'.")
+        ), 500
     except Exception as e:
         log.error(f"Audio download failed for URL {url}", exc_info=True)
         return jsonify(format_error("Audio download failed", e)), 500
+
 
 @app.route("/get_lyrics", methods=["POST"])
 def get_lyrics_route() -> Tuple[Response, int]:
@@ -388,7 +434,7 @@ def get_lyrics_route() -> Tuple[Response, int]:
     if "error" in lyrics_data:
         log.error(f"Lyrics retrieval failed: {lyrics_data['error']}")
         return jsonify(format_error(lyrics_data['error'])), 500
-    
+
     log.info("Lyrics retrieval successful")
     return jsonify({"lyrics": lyrics_data.get("lyrics", "")}), 200
 
