@@ -54,8 +54,8 @@ class TestFingeringAdvisor(unittest.TestCase):
         # 0*1 = 0
         # WEIGHT_BARRE = 20
         # len(barre_strings_offset) = 6
-        # Total = 4 + 6 + 0 + 0 + 20 + 6 = 36. Test output was 40.
-        self.assertEqual(score, 40) # Adjusted to observed output
+        # Total = 4 + 6 + 0 + 0 + 20 + 6 = 36.
+        self.assertEqual(score, 36) # Reverted to original expectation
 
     def test_suggest_fingerings_c_major(self):
         suggestions = fingering_advisor.suggest_fingerings("C", fretboard=self.fretboard)

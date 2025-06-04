@@ -125,12 +125,14 @@ def parse_chord_to_notes(chord_string: str, prefer_sharp_for_output: bool = True
         final_prefer_sharp = True
     chord_notes = [get_note_name(v, final_prefer_sharp) for v in chord_note_values]
     log.debug(f"Parsed '{original_chord_string}' to {chord_notes}")
+    # print(f"DEBUG parse_chord_to_notes: input='{original_chord_string}', output_notes={chord_notes}, root_value={root_value}, quality_str='{quality_str}', formula_key='{formula_key_to_use}'") # DEBUG
     return chord_notes
 
 def get_chord_type_from_intervals(root_value: int, note_values: List[int]) -> Optional[str]:
     if not note_values or root_value is None: return None
     intervals_from_root = sorted(list(set((val - root_value + 12) % 12 for val in note_values)))
     if 0 not in intervals_from_root : intervals_from_root.insert(0,0)
+    # print(f"DEBUG get_chord_type_from_intervals: root_value={root_value}, note_values={note_values}, intervals_from_root={intervals_from_root}")
 
     # Sort CHORD_FORMULAS by length of interval list (descending) to check more specific chords first
     # Then by key name for consistent tie-breaking if lengths are equal.
@@ -141,12 +143,16 @@ def get_chord_type_from_intervals(root_value: int, note_values: List[int]) -> Op
         if set(intervals_from_root) == set(formula_intervals):
             # Return the exact type_name from CHORD_FORMULAS.
             # Downstream functions will handle any necessary normalization.
+            # print(f"DEBUG get_chord_type_from_intervals: Matched sorted_formulas: {type_name} for intervals {intervals_from_root}") # Reverted print
             return type_name
     
-    # Explicit fallback for basic major/minor if not caught by sorted list (e.g. if alias like "m" was primary key)
-    if set(intervals_from_root) == set(CHORD_FORMULAS.get("maj", [])):
+    # Explicit fallback for basic major/minor if not caught by sorted list
+    # print(f"DEBUG get_chord_type_from_intervals: Fallback check. intervals_from_root = {intervals_from_root} (type: {type(intervals_from_root)})")
+    if intervals_from_root == [0, 4, 7]: # Direct list comparison for major triad
+        # print("DEBUG get_chord_type_from_intervals: Matched explicit fallback direct: maj FOR [0,4,7]")
         return "maj"
-    if set(intervals_from_root) == set(CHORD_FORMULAS.get("min", [])) or set(intervals_from_root) == set(CHORD_FORMULAS.get("m",[])):
+    if intervals_from_root == [0, 3, 7]: # Direct list comparison for minor triad
+        # print("DEBUG get_chord_type_from_intervals: Matched explicit fallback direct: min FOR [0,3,7]")
         return "min"
             
     log.warning(f"Could not determine chord type for intervals: {intervals_from_root} from root_value {root_value}")
