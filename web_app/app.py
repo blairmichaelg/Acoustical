@@ -2,7 +2,7 @@ import os
 import tempfile
 import logging
 import shutil
-from typing import Dict, Any, Tuple, Optional
+from typing import Dict, Any, Tuple, Optional, List # Added List
 
 from flask import Flask, request, jsonify, send_from_directory, Response
 from werkzeug.utils import secure_filename
@@ -10,6 +10,9 @@ from werkzeug.utils import secure_filename
 from chord_extraction import get_chords, get_chords_batch, check_backend_availability
 from key_transpose_capo.transpose import transpose_chords
 from key_transpose_capo.capo_advisor import recommend_capo
+from key_transpose_capo.fingering_advisor import suggest_fingerings as suggest_fingerings_lib
+from key_transpose_capo.fingering_advisor import score_shape_playability # For serializing
+from music_theory.fretboard import Fretboard # For fingering advisor
 from flourish_engine.rule_based import apply_rule_based_flourishes
 from key_transpose_capo.key_analysis import detect_key_from_chords
 from audio_input.utils import check_audio_file
@@ -301,51 +304,52 @@ def flourish_route() -> Tuple[Response, int]:
     """
     log.info("Received request for /flourish")
     data = request.get_json()
-    if not data or 'chords' not in data:
+    if not data or 'chords' not in data: # Expects list of chord objects
         log.warning("Missing chords in /flourish request")
-        return jsonify(format_error("Missing chords.")), 400
+        return jsonify(format_error("Missing chords (expected list of objects).")), 400
 
-    method = data.get("method", "rule_based")
-    rule_set_name = data.get("rule_set_name", "default")
+    method = data.get("method", "rule_based") # rule_based, gpt4all, magenta
+    rule_set_name = data.get("rule_set_name", "default") # For rule_based
+    lyrics_context = data.get("lyrics") # For gpt4all
 
     try:
-        chords = data['chords']
-        if not isinstance(chords, list) or not all(
-            isinstance(c, dict) and 'chord' in c for c in chords
+        chord_progression_objects = data['chords'] # List of {"chord": "Am", "time": 0.0}
+        if not isinstance(chord_progression_objects, list) or not all(
+            isinstance(c, dict) and 'chord' in c for c in chord_progression_objects
         ):
             log.warning("Invalid chords format in /flourish request")
             return jsonify(
                 format_error("Invalid chords format. Expected list of objects with 'chord' key.")
             ), 400
 
-        chord_list = [c['chord'] for c in chords]
-        flourishes = []
+        flourishes_result = []
 
         if method == "magenta":
             from flourish_engine.magenta_flourish import generate_magenta_flourish
-            flourishes = generate_magenta_flourish(chord_list)
+            # Magenta might need just strings, or adapt it to take objects
+            chord_strings_for_magenta = [c['chord'] for c in chord_progression_objects]
+            flourishes_result = generate_magenta_flourish(chord_strings_for_magenta)
             log.info("Magenta flourish generation requested")
         elif method == "gpt4all":
-            from flourish_engine.gpt4all_flourish import suggest_chord_substitutions
-            lyrics = data.get("lyrics")
-            flourishes = suggest_chord_substitutions(chord_list, lyrics=lyrics)
+            from flourish_engine.gpt4all_flourish import suggest_chord_substitutions as gpt4all_suggest
+            flourishes_result = gpt4all_suggest(chord_progression_objects, lyrics=lyrics_context)
             log.info("GPT4All flourish generation requested")
         elif method == "rule_based":
-            flourishes = apply_rule_based_flourishes(chord_list, rule_set_name=rule_set_name)
+            flourishes_result = apply_rule_based_flourishes(chord_progression_objects, rule_set_name=rule_set_name)
             log.info(f"Rule-based flourish generation requested with rule set: {rule_set_name}")
         else:
             log.warning(f"Invalid flourish method requested: {method}")
             return jsonify(
                 format_error(
                     f"Invalid flourish method: {method}. Available methods: "
-                    "rule_based, magenta, gpt4all."
+                    "rule_based, gpt4all, magenta."
                 )
             ), 400
-
-        return jsonify({"flourishes": flourishes}), 200
-    except ValueError as e:
-        log.warning(f"Invalid rule set name in /flourish request: {e}")
-        return jsonify(format_error(f"Invalid rule set: {e}")), 400
+        # Ensure consistent output format if different engines return differently
+        return jsonify({"flourishes": flourishes_result}), 200
+    except ValueError as e: # For invalid rule_set_name from rule_based
+        log.warning(f"Invalid input for /flourish: {e}")
+        return jsonify(format_error(f"Invalid input: {e}")), 400
     except Exception as e:
         log.error("Flourish suggestion failed", exc_info=True)
         return jsonify(format_error("Flourish suggestion failed", e)), 500
@@ -373,9 +377,9 @@ def key_route() -> Tuple[Response, int]:
             ), 400
 
         chord_strings = [c['chord'] for c in chords]
-        key = detect_key_from_chords(chord_strings)
-        log.info(f"Key detection successful: {key}")
-        return jsonify({"key": key}), 200
+        key_info = detect_key_from_chords(chord_strings) # Returns a dict
+        log.info(f"Key detection successful: {key_info}")
+        return jsonify(key_info), 200 # Return the whole dict
     except Exception as e:
         log.error("Key detection failed", exc_info=True)
         return jsonify(format_error("Key detection failed", e)), 500
@@ -476,6 +480,57 @@ async def get_lyrics_route() -> Tuple[Response, int]:
     else:
         log.error(f"Unknown lyrics retrieval method: {lyrics_info['method']}")
         return jsonify(format_error("Unknown lyrics retrieval method.")), 500
+
+
+@app.route("/suggest_fingerings", methods=["POST"])
+def suggest_fingerings_route() -> Tuple[Response, int]:
+    """
+    Suggests guitar fingerings for a given chord string.
+    """
+    log.info("Received request for /suggest_fingerings")
+    data = request.get_json()
+    if not data or "chord_string" not in data:
+        log.warning("Missing chord_string in /suggest_fingerings request")
+        return jsonify(format_error("Missing chord_string.")), 400
+
+    chord_str = data["chord_string"]
+    num_suggestions = data.get("num_suggestions", 5)
+    tuning_str = data.get("tuning") # e.g., "E,A,D,G,B,e"
+
+    try:
+        fretboard_tuning: Optional[List[str]] = None
+        if tuning_str:
+            fretboard_tuning = [s.strip() for s in tuning_str.split(',')]
+        
+        fb = Fretboard(tuning=fretboard_tuning)
+        suggestions = suggest_fingerings_lib(chord_str, fretboard=fb)
+
+        if not suggestions:
+            return jsonify({"chord": chord_str, "suggestions": []}), 200
+
+        output_suggestions = []
+        # Default Fretboard for scoring if not passed, or use the one created
+        score_fb = fb 
+        for i, shape in enumerate(suggestions):
+            if i >= num_suggestions:
+                break
+            score = score_shape_playability(shape, score_fb)
+            output_suggestions.append({
+                "name": shape.name,
+                "root": shape.template_root_note_str, # Actual root
+                "type": shape.chord_type,
+                "base_fret": shape.base_fret_of_template, # Actual barre fret
+                "fingerings": shape.fingerings,
+                "score": score,
+                "is_movable": shape.is_movable,
+                "barre_strings": shape.barre_strings_offset
+            })
+        
+        return jsonify({"chord": chord_str, "suggestions": output_suggestions}), 200
+
+    except Exception as e:
+        log.error(f"Error in suggest_fingerings route for '{chord_str}': {e}", exc_info=True)
+        return jsonify(format_error(f"Failed to suggest fingerings for '{chord_str}'.", e)), 500
 
 
 if __name__ == "__main__":
