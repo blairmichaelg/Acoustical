@@ -1,132 +1,47 @@
-# Development Plan: Acoustic Cover Assistant
+# Acoustical Project: Refined Medium-Term Development Plan
 
-## Overview
+## Overall Vision
+To provide beginner/intermediate singer/songwriters with a seamless tool to analyze any song (via URL), extract chords, retrieve lyrics, synchronize them, and then offer creative ideas for flourishes, reharmonization, and practical fingering suggestions.
 
-This document details the architecture, milestones, and prioritized tasks for the project. Use it for onboarding, sprint planning, and tracking progress.
+## Phase 1: Enhanced Audio Input & Basic Lyrics Retrieval
+*   **Goal:** Make the app significantly easier to use by allowing direct URL input for chord extraction, alongside general UI/UX improvements and the ability to fetch lyrics.
+*   **Tasks:**
+    *   **Implement Direct URL Input for Chord Extraction:**
+        *   Modify `chord_extraction.get_chords` to accept URLs (internally handling `yt-dlp` download to a temporary file).
+        *   Update CLI `extract-chords` command to accept URLs.
+        *   Add a URL input field to `web_app/index.html` for chord extraction.
+    *   **NEW: Basic Lyrics Retrieval:**
+        *   Add functionality to fetch lyrics for a song given its title/artist (or from the YouTube URL metadata). This would likely involve integrating with a lyrics API (e.g., Genius, if a free/developer tier is available) or a web scraping module.
+        *   Display retrieved lyrics in the web app, initially as plain text alongside the extracted chords.
+    *   Detailed review of `web_app/index.html` for UI/UX and accessibility (e.g., clearer feedback, progress indicators, responsive design).
+    *   Address any remaining minor code quality issues.
 
----
+## Phase 2: Chord-Lyrics Synchronization & Song Structure
+*   **Goal:** Integrate lyrics and chords more deeply, providing a comprehensive, synchronized view of the song.
+*   **Tasks:**
+    *   **Heuristic-based Chord-Lyrics Alignment:** Develop a basic algorithm to align extracted chords (with their timestamps) with lyrical lines or sections. This would be an initial, simpler approach, aiming for "placement-wise" synchronization rather than precise word-level alignment. It might involve:
+        *   Identifying line breaks and sections in lyrics.
+        *   Associating chords with the start of lyrical lines or phrases based on their timestamps.
+    *   **Basic Song Structure Identification:** Implement logic to identify common song sections (e.g., verse, chorus, bridge) based on lyrical repetition patterns or changes in chord progressions.
+    *   **Display Integration:** Present synced chords and lyrics in an intuitive, scrollable format in the web app.
 
-## Milestones & Timeline
+## Phase 3: Advanced Flourish Generation & Chord Substitution
+*   **Goal:** Empower singer/songwriters with more creative tools for song modification and reinterpretation.
+*   **Tasks:**
+    *   Research and integrate music theory concepts (e.g., voice leading, common melodic patterns, harmonic context) into `flourish_engine`.
+    *   Enhance algorithms for sophisticated, contextually appropriate flourishes.
+    *   **NEW: Basic Chord Substitution/Reharmonization:** Implement functionality to suggest alternative chords that fit the key, mood, or harmonic function of a progression.
+    *   Update interfaces and create new tests for these features.
 
-| Week | Goals                                                                 |
-|------|-----------------------------------------------------------------------|
-| 1    | Set up environment; prototype chord extraction (Chordino, autochord)  |
-| 2    | Build key detection; transpose & capo logic; unit tests               |
-| 3    | Implement rule-based flourish engine; integrate Magenta improv_rnn    |
-| 4    | Wire up GPT4All prompts; build CLI interface; initial end-to-end test |
-| 5    | Develop minimal web interface; finalize docs; polish UI               |
+## Phase 4: Intelligent Fingering Advisor
+*   **Goal:** Provide practical guitar fingering suggestions for chords and progressions, optimizing for ease and flow.
+*   **Tasks:**
+    *   Design data models to represent guitar fretboards, string tunings, and chord voicings.
+    *   Develop algorithms for fingering generation and optimization (playability, progression flow).
+    *   Create a new module for this functionality.
+    *   Integrate into CLI and Web App (e.g., visual fretboard diagrams).
 
----
-
-## Module Breakdown
-
-### 1. Chord Extraction
-
-- Integrate Chordino (pyvamp), autochord, chord-extractor.
-- Fallback logic: try each backend in order.
-- Output: JSON list of `{time, chord}`.
-- Optional: Add aubio/essentia for onset/section detection.
-
-### 2. Key Analysis & Transposition
-
-- Use music21 for key detection.
-- Implement `transpose_chords(chords, interval)`.
-- Unit tests with known charts.
-
-### 3. Capo Advisor
-
-- Score open vs. barre chords per fret.
-- For each fret, transpose and score; pick minimum.
-- Output: recommended fret, transposed chords.
-
-### 4. Flourish & Suggestion Engine
-
-- Rule-based substitutions (I↔vi, ii↔IV, V/V insertion).
-- Magenta improv_rnn for embellishments.
-- GPT4All for creative suggestions (offline LLM).
-
-### 5. Interfaces & Integration
-
-- CLI: Modular commands for each function.
-- Web App: Flask backend, minimal HTML/JS frontend, project persistence.
-
-### 6. Testing & Documentation
-
-- Pytest for all modules, sample fixtures.
-- Docstrings, sample I/O, onboarding README.
-
----
-
-## Good Ideas & Optimizations
-
-- Plugin system for new extraction/flourish backends.
-- Batch processing for multiple files.
-- Audio downloader integration.
-- Chord chart/sequence visualization in web UI.
-- Configurable pipelines (YAML/JSON).
-- Graceful error handling and fallback.
-- Cross-platform support.
-- AI prompt template versioning.
-- Continuous integration (GitHub Actions).
-- Extensive examples in `/data` and `/tests`.
-
----
-
-## Prioritized Task List
-
-> **Note:** Keep this checklist up to date as tasks are completed. Link to relevant issues/PRs where possible.
-
-1. [ ] Finalize and document chord extraction backends.
-2. [ ] Implement fallback logic and error handling.
-3. [ ] Build key detection and transposition functions.
-4. [ ] Develop capo advisor algorithm and tests.
-5. [ ] Scaffold rule-based flourish engine.
-6. [ ] Integrate Magenta and GPT4All modules.
-7. [ ] Build CLI commands for all core features.
-8. [ ] Develop minimal Flask web interface.
-9. [ ] Add batch processing and plugin support.
-10. [ ] Expand tests and add sample data.
-11. [ ] Set up CI and code quality checks.
-12. [ ] Polish documentation and onboarding.
-
-> **TODO:** Add links to issues/PRs for each item above.
-
----
-
-## Known Limitations & Future Ideas
-
-- Chordino and some dependencies are not supported on Windows.
-- Large/corrupt audio files may cause extraction failures.
-- Web UI is minimal; could be expanded with visualization and editing.
-- Consider supporting more audio formats and languages.
-- Explore cloud-based processing for large files.
-- Add more AI/ML flourish models and plugin types.
-- Improve onboarding and developer documentation.
-- [Add more as project evolves.]
-
----
-
-## Example JSON Output
-
-```json
-[
-  {"time": 0.0, "chord": "G"},
-  {"time": 2.5, "chord": "D"}
-]
-```
-
----
-
-## AI Prompt Template
-
-```
-Given this chord progression in key of G: [G, Em, C, D]
-And these lyrics: “I walked along the riverside…”
-Suggest three chord substitutions or extensions that fit mood.
-```
-
----
-
-## Contact
-
-Open issues or discussions on GitHub for support and ideas.
+## Cross-Cutting Concerns (Throughout all Phases)
+*   **Performance Monitoring:** Continuously monitor and optimize processing times, especially with new audio and text analysis components.
+*   **Error Handling & User Feedback:** Ensure all user-facing messages are clear, actionable, and guide the user effectively.
+*   **Modularity & Testability:** Maintain high standards for code organization and comprehensive testing.

@@ -314,6 +314,54 @@ def download_audio_route() -> Tuple[Response, int]:
         log.error(f"Audio download failed for URL {url}", exc_info=True)
         return jsonify(format_error("Audio download failed", e)), 500
 
+@app.route("/extract_chords_from_url", methods=["POST"])
+def extract_chords_from_url_route() -> Tuple[Response, int]:
+    """
+    Handles chord extraction from a URL.
+    """
+    log.info("Received request for /extract_chords_from_url")
+    url = request.form.get('url')
+    if not url:
+        log.warning("No URL provided for /extract_chords_from_url request")
+        return jsonify(format_error("No URL provided.")), 400
+
+    try:
+        chords = get_chords(url) # get_chords now handles URL internally
+        log.info(f"Successfully extracted chords from URL: {url}")
+        return jsonify({"chords": chords}), 200
+    except Exception as e:
+        log.error(f"Chord extraction from URL failed for {url}", exc_info=True)
+        return jsonify(format_error("Chord extraction from URL failed", e)), 500
+
+@app.route("/get_lyrics", methods=["POST"])
+def get_lyrics_route() -> Tuple[Response, int]:
+    """
+    Handles lyrics retrieval request.
+    Accepts either 'url' or 'title' and 'artist'.
+    """
+    log.info("Received request for /get_lyrics")
+    data = request.get_json()
+
+    url = data.get("url")
+    title = data.get("title")
+    artist = data.get("artist")
+
+    if not (url or (title and artist)):
+        log.warning("Missing URL or title/artist in /get_lyrics request")
+        return jsonify(format_error("Missing URL or song title/artist.")), 400
+
+    # Placeholder for actual lyrics fetching logic
+    # In a real scenario, this would integrate with a lyrics API or web scraper.
+    lyrics = ""
+    if url:
+        lyrics = f"Lyrics for song from URL: {url}\n\n(Placeholder lyrics: Verse 1... Chorus... Verse 2...)"
+    elif title and artist:
+        lyrics = f"Lyrics for '{title}' by {artist}\n\n(Placeholder lyrics: Verse 1... Chorus... Verse 2...)"
+
+    log.info("Lyrics retrieval successful (placeholder)")
+    return jsonify({"lyrics": lyrics}), 200
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     app.run(debug=True)
