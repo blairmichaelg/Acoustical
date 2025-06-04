@@ -15,8 +15,16 @@ from key_transpose_capo.key_analysis import detect_key_from_chords
 from audio_input.utils import check_audio_file
 from common.utils import format_error
 
-from lyrics_analysis.lyrics_retriever import get_lyrics as get_lyrics_func
-from lyrics_analysis.lyrics_analyzer import align_chords_with_lyrics, identify_song_structure
+from lyrics_analysis.lyrics_retriever import (
+    get_lyrics_from_url_or_metadata,
+    parse_azlyrics_html
+)
+from lyrics_analysis.lyrics_analyzer import (
+    align_chords_with_lyrics,
+    identify_song_structure
+)
+# The agent will inject the `use_mcp_tool` function.
+
 
 app = Flask(__name__)
 log = logging.getLogger(__name__)
@@ -32,7 +40,7 @@ def index() -> Response:
     return send_from_directory(os.path.dirname(__file__), "index.html")
 
 
-def process_chord_extraction(
+async def process_chord_extraction(
     audio_input_source: Optional[str], is_url: bool
 ) -> Tuple[Dict[str, Any], int]:
     """
@@ -51,14 +59,20 @@ def process_chord_extraction(
             log.info(f"Successfully extracted chords from URL: {audio_input_source}")
 
             # Attempt to get lyrics for the URL
-            lyrics_result = get_lyrics_func(url=audio_input_source)
-            if "lyrics" in lyrics_result:
-                lyrics_text = lyrics_result["lyrics"]
-                log.info(f"Successfully retrieved lyrics for URL: {audio_input_source}")
-            elif "error" in lyrics_result:
+            lyrics_info = get_lyrics_from_url_or_metadata(url=audio_input_source)
+            if lyrics_info.get("method") == "placeholder_url":
+                lyrics_text = (
+                    f"Lyrics for song from URL: {lyrics_info['url']}\n\n"
+                    "(Placeholder lyrics: Verse 1...\nChorus...\nVerse 2...)"
+                )
+                log.info(
+                    "Successfully retrieved placeholder lyrics for URL: "
+                    f"{audio_input_source}"
+                )
+            elif "error" in lyrics_info:
                 log.warning(
                     f"Could not retrieve lyrics for URL {audio_input_source}: "
-                    f"{lyrics_result['error']}"
+                    f"{lyrics_info['error']}"
                 )
         else:
             # For file uploads, save to temp and then process
@@ -78,7 +92,7 @@ def process_chord_extraction(
         aligned_lyrics = []
         song_structure = {"structure": []}
 
-        if lyrics_text:  # Only align and identify structure if lyrics were successfully retrieved
+        if lyrics_text:  # Only align and identify structure if lyrics were retrieved
             aligned_lyrics = align_chords_with_lyrics(chords, lyrics_text)
             song_structure = identify_song_structure(lyrics_text, chords)
 
@@ -104,7 +118,7 @@ def process_chord_extraction(
 
 
 @app.route("/extract_chords", methods=["POST"])
-def extract_chords_route() -> Tuple[Response, int]:
+async def extract_chords_route() -> Tuple[Response, int]:
     """
     Handles single audio file upload and chord extraction.
     """
@@ -112,11 +126,11 @@ def extract_chords_route() -> Tuple[Response, int]:
     if 'audio' not in request.files:
         log.warning("No audio file uploaded in /extract_chords request")
         return jsonify(format_error("No audio file uploaded.")), 400
-    return process_chord_extraction(None, False)  # Pass None for source, indicate it's a file upload
+    return await process_chord_extraction(None, False)
 
 
 @app.route("/extract_chords_from_url", methods=["POST"])
-def extract_chords_from_url_route() -> Tuple[Response, int]:
+async def extract_chords_from_url_route() -> Tuple[Response, int]:
     """
     Handles chord extraction from a URL.
     """
@@ -126,7 +140,7 @@ def extract_chords_from_url_route() -> Tuple[Response, int]:
     if not url:
         log.warning("No URL provided for /extract_chords_from_url request")
         return jsonify(format_error("No URL provided.")), 400
-    return process_chord_extraction(url, True)  # Pass URL, indicate it's a URL
+    return await process_chord_extraction(url, True)
 
 
 @app.route("/extract_chords_batch", methods=["POST"])
@@ -215,7 +229,7 @@ def transpose_route() -> Tuple[Response, int]:
 
     try:
         chords = data['chords']
-        semitones_val = int(data['semitones'])  # Renamed to avoid conflict
+        semitones_val = int(data['semitones'])
         if not isinstance(chords, list) or not all(
             isinstance(c, dict) and 'chord' in c for c in chords
         ):
@@ -413,7 +427,7 @@ def download_audio_route() -> Tuple[Response, int]:
 
 
 @app.route("/get_lyrics", methods=["POST"])
-def get_lyrics_route() -> Tuple[Response, int]:
+async def get_lyrics_route() -> Tuple[Response, int]:
     """
     Handles lyrics retrieval request.
     Accepts either 'url' or 'title' and 'artist'.
@@ -429,14 +443,39 @@ def get_lyrics_route() -> Tuple[Response, int]:
         log.warning("Missing URL or title/artist in /get_lyrics request")
         return jsonify(format_error("Missing URL or song title/artist.")), 400
 
-    lyrics_data = get_lyrics_func(url=url, title=title, artist=artist)
+    lyrics_info = get_lyrics_from_url_or_metadata(url=url, title=title, artist=artist)
 
-    if "error" in lyrics_data:
-        log.error(f"Lyrics retrieval failed: {lyrics_data['error']}")
-        return jsonify(format_error(lyrics_data['error'])), 500
-
-    log.info("Lyrics retrieval successful")
-    return jsonify({"lyrics": lyrics_data.get("lyrics", "")}), 200
+    if lyrics_info["method"] == "scrape_azlyrics":
+        try:
+            # The agent will inject the `use_mcp_tool` function.
+            html_content = await use_mcp_tool(  # pylint: disable=undefined-variable
+                server_name="github.com/zcaceres/fetch-mcp",
+                tool_name="fetch_html",
+                arguments={"url": lyrics_info["url"]}
+            )
+            lyrics_text = parse_azlyrics_html(
+                html_content, lyrics_info["title"], lyrics_info["artist"]
+            )
+            if lyrics_text:
+                return jsonify({"lyrics": lyrics_text, "source": "azlyrics.com"}), 200
+            else:
+                log.warning(
+                    "Failed to parse lyrics from AZLyrics for "
+                    f"{lyrics_info['title']} by {lyrics_info['artist']}"
+                )
+                return jsonify(format_error("Failed to retrieve lyrics from AZLyrics.")), 500
+        except Exception as e:
+            log.error(f"Error fetching/parsing AZLyrics: {e}", exc_info=True)
+            return jsonify(format_error("Error fetching lyrics from AZLyrics.", e)), 500
+    elif lyrics_info["method"] == "placeholder_url":
+        lyrics_text = (
+            f"Lyrics for song from URL: {lyrics_info['url']}\n\n"
+            "(Placeholder lyrics: Verse 1...\nChorus...\nVerse 2...)"
+        )
+        return jsonify({"lyrics": lyrics_text, "source": "placeholder_url"}), 200
+    else:
+        log.error(f"Unknown lyrics retrieval method: {lyrics_info['method']}")
+        return jsonify(format_error("Unknown lyrics retrieval method.")), 500
 
 
 if __name__ == "__main__":
