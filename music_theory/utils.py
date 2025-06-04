@@ -120,8 +120,11 @@ def parse_chord_to_notes(chord_string: str, prefer_sharp_for_output: bool = True
     log.info(f"Parsing chord: {chord_string}")
     original_chord_string = chord_string
 
+    # Normalize H to B before regex matching
+    processed_chord_string = chord_string.replace("H", "B")
+
     # Regex to capture root note (C, C#, Db, etc.)
-    root_match = re.match(r"([A-G][#b]?)", chord_string)
+    root_match = re.match(r"([A-G][#b]?)", processed_chord_string)
     if not root_match:
         log.warning(f"Could not parse root note from chord: {original_chord_string}")
         return [original_chord_string] # Return original if unparseable
@@ -129,9 +132,11 @@ def parse_chord_to_notes(chord_string: str, prefer_sharp_for_output: bool = True
     root_note_str = root_match.group(1)
     root_value = get_note_value(root_note_str)
     if root_value is None: # Should be caught by get_note_value's logging
+        # If root_match succeeded but get_note_value failed (e.g. "Hx"), it's an invalid root.
+        # If root_match failed, original_chord_string is returned earlier.
         return [original_chord_string]
 
-    quality_str = chord_string[len(root_note_str):].strip()
+    quality_str = processed_chord_string[len(root_note_str):].strip()
     
     formula_key_to_use = None
     # Iterate through patterns to find the best match for the quality string
