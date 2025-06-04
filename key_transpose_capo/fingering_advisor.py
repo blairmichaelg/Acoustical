@@ -17,53 +17,6 @@ WEIGHT_MUTED_STRINGS = 1
 MIN_FINGERS_FOR_PENALTY = 2
 
 
-def get_chord_type_from_intervals(
-    root_value: int,
-    note_values: List[int]
-) -> Optional[str]:
-    """
-    Determines chord type string (e.g., "maj", "m7") based on root and note intervals.
-    This is a simplified version and might need expansion for complex chords.
-    """
-    if not note_values:
-        return None
-
-    intervals_from_root = sorted([(val - root_value + 12) % 12 for val in note_values])
-    # Remove root interval (0) for matching against CHORD_FORMULAS if it's present
-    # and CHORD_FORMULAS also don't store the 0 for root.
-    # However, our CHORD_FORMULAS *do* include the 0 for P1.
-    # So, we just need to ensure the 0 is present in intervals_from_root if comparing.
-    # For simplicity, let's assume CHORD_FORMULAS are the source of truth for interval patterns.
-
-    # Ensure root is part of the intervals for comparison
-    if 0 not in intervals_from_root:
-         # This case implies note_values didn't include the root, or root_value was wrong.
-         # For now, let's assume parse_chord_to_notes gives all notes including root.
-         # If we derive intervals from parsed_notes, the root's interval (0) will be there.
-         pass
-
-
-    for type_name, formula_intervals in music_theory_utils.CHORD_FORMULAS.items():
-        # Check if the set of intervals matches (order-agnostic, duplicates ignored by set)
-        # And ensure the number of unique intervals also matches for basic cases
-        # More robust: check for specific required intervals for each type.
-        if set(intervals_from_root) == set(formula_intervals) and \
-           len(set(intervals_from_root)) == len(set(formula_intervals)):
-            # Prioritize shorter, more common names if aliases exist (e.g., "m" over "min")
-            if type_name == "min": return "m"
-            if type_name == "maj": return "maj" # Though "maj" is often implied by empty quality
-            return type_name
-    
-    # Fallback for simple major/minor if only triad notes are present
-    if set(intervals_from_root) == set(music_theory_utils.CHORD_FORMULAS["maj"]):
-        return "maj"
-    if set(intervals_from_root) == set(music_theory_utils.CHORD_FORMULAS["m"]):
-        return "m"
-
-    log.warning(f"Could not determine chord type for intervals: {intervals_from_root} from root {root_value}")
-    return None
-
-
 def score_shape_playability(shape: ChordShape, fretboard: Fretboard) -> int:
     score = 0
     num_fingers_used = 0
@@ -148,11 +101,12 @@ def suggest_fingerings(
         # Filter out None values if any note parsing failed within parse_chord_to_notes
         valid_note_values = [nv for nv in note_values if nv is not None]
         
-        chord_type = get_chord_type_from_intervals(root_value, valid_note_values)
+        chord_type = music_theory_utils.get_chord_type_from_intervals(root_value, valid_note_values)
         if chord_type is None:
             # Fallback if type determination fails, try to use raw quality string
-            quality_str_from_input = chord_str[len(root_note_str):].lower()
-            chord_type = quality_str_from_input if quality_str_from_input else "maj"
+            # Ensure root_note_str is available here from the current scope
+            quality_str_from_original = chord_str[len(root_note_str):].strip() 
+            chord_type = quality_str_from_original if quality_str_from_original else "maj"
             log.warning(f"Could not determine chord type from intervals for {chord_str}. Using '{chord_type}'.")
 
 
@@ -189,14 +143,14 @@ def suggest_fingerings(
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
-    fb = Fretboard()
+    fretboard_instance = Fretboard() # Use a different variable name
     chords_to_test = ["C", "Gmaj", "Am", "Emin", "D7", "F#maj", "Bb", "Cmaj7", "Gm7"]
     for chord_test_str in chords_to_test:
         print(f"\n--- Testing: {chord_test_str} ---")
-        suggestions = suggest_fingerings(chord_test_str, fretboard=fb)
+        suggestions = suggest_fingerings(chord_test_str, fretboard=fretboard_instance)
         if suggestions:
             for i, shape_sugg in enumerate(suggestions):
-                score_display = score_shape_playability(shape_sugg, fb)
+                score_display = score_shape_playability(shape_sugg, fretboard_instance) 
                 print(f"  Suggestion {i+1}: {shape_sugg.name} (Score: {score_display})")
                 print(f"     Fingerings: {shape_sugg.fingerings}")
         else:
