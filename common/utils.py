@@ -8,6 +8,17 @@ from typing import Any, Dict, Optional
 
 log = logging.getLogger(__name__)
 
+
+def handle_exception(
+    e: Exception, message: str = "An unexpected error occurred"
+) -> Dict[str, str]:
+    """
+    Logs an exception with a custom message and returns a standardized error dictionary.
+    """
+    log.exception(f"{message}: {e}")
+    return {"error": f"{message}: {e}"}
+
+
 def format_error(message: str, exc: Optional[Exception] = None) -> Dict[str, str]:
     """
     Formats an error message, optionally including an exception.
@@ -22,11 +33,11 @@ def format_error(message: str, exc: Optional[Exception] = None) -> Dict[str, str
         Dict[str, str]: A dictionary containing the formatted error message.
     """
     if exc:
-        log.error(f"{message}: {exc}", exc_info=True) # Log traceback
-        return {"error": f"{message}: {exc}"}
+        return handle_exception(exc, message)
     else:
         log.error(message)
         return {"error": message}
+
 
 def serialize_result(result: Any) -> str:
     """
@@ -42,6 +53,4 @@ def serialize_result(result: Any) -> str:
     try:
         return json.dumps(result, indent=2, ensure_ascii=False)
     except Exception as e:
-        log.error(f"Serialization failed: {e}", exc_info=True)
-        # Return a JSON string containing an error dictionary
-        return json.dumps({"error": f"Serialization failed: {e}"})
+        return handle_exception(e, "Serialization failed")

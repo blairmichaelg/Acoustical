@@ -1,5 +1,0 @@
-# Dummy audio file for plugin error testing
-# Duration: 1.0s
-# Format: Text (simulated audio)
-#
-# Used for testing plugin error handling and fallback behavior

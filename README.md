@@ -1,13 +1,151 @@
-# Acoustic Cover Assistant
+# Acoustic Cover Assistant (Cloud-Enhanced)
 
 ![CI](https://github.com/blairmichaelg/Acoustical/actions/workflows/python-app.yml/badge.svg)
+[![Cloud Build](https://storage.googleapis.com/cloud-build-badges/gen-lang-client-0894232365/trigger_id_placeholder.svg?branch=main)](https://console.cloud.google.com/cloud-build/builds?project=gen-lang-client-0894232365)
 
-A powerful, open-source tool designed for **beginner to intermediate singer/songwriters** to effortlessly analyze, adapt, and creatively transform songs. Acoustical provides a seamless pipeline to extract chords, retrieve lyrics, analyze key, transpose, recommend capo positions, and generate musical flourishes from any song, whether from a local file or a direct URL.
+A powerful, open-source tool designed for **beginner to intermediate singer/songwriters** to effortlessly analyze, adapt, and creatively transform songs. Acoustical, enhanced with **Google Cloud Platform (GCP)**, provides a scalable and intelligent pipeline to extract chords, retrieve lyrics, analyze key, transpose, recommend capo positions, and generate musical flourishes from any song.
 
-Our vision is to empower you to **think of any song and instantly get the chords, lyrics, and creative progression ideas**, helping you put your own unique spin on covers or build new compositions.
+Our vision is to empower you to **think of any song and instantly get the chords, lyrics, and creative progression ideas**, helping you put your own unique spin on covers or build new compositions, all powered by a robust cloud backend.
 
-> **Note:** GitHub repository info has been updated.
+> **Note:** This project is now being enhanced with Google Cloud Platform for improved scalability, AI capabilities, and as a learning experience.
 
+---
+
+## Cloud Architecture Overview
+
+Acoustical leverages several Google Cloud services to provide its features:
+
+*   **Web Application Hosting:** The Flask web application is containerized and deployed on **Google Cloud Run**, providing a scalable, serverless environment.
+*   **Audio & Data Storage:** **Google Cloud Storage (GCS)** is used for storing uploaded audio files, temporary processing files, and potentially cached analysis results.
+*   **Chord Extraction:** The core Essentia-based chord extraction is deployed as a custom model on **Vertex AI Endpoints**, offering a scalable microservice.
+*   **AI-Powered Creative Features:**
+    *   **Magenta Flourishes:** Magenta models for musical flourish generation are intended to be deployed on **Vertex AI Endpoints**.
+    *   **Chord Substitutions (LLM):** An LLM (like Google's Gemini via its API) is accessed through a **Google Cloud Function** to provide intelligent chord substitution suggestions.
+*   **Lyrics Retrieval:** A **Google Cloud Function** may be used to orchestrate calls to external lyrics APIs or perform web scraping.
+*   **CI/CD & Container Registry:** **Google Cloud Build** automates the building of Docker images, which are stored in **Google Artifact Registry**.
+*   **API Key Management:** **Google Secret Manager** is used for securely storing any necessary API keys.
+
+```mermaid
+graph TD
+    A[User: Web Browser] --> B[Cloud Run: Flask Web App];
+    B --> C[GCS: Audio Uploads/Static Assets];
+    B -- API Call --> D[Vertex AI Endpoint: Essentia Chord Extraction];
+    D -- Reads Audio From --> C;
+    B -- API Call --> E[Vertex AI Endpoint: Magenta Flourishes];
+    B -- API Call --> F[Cloud Function: LLM Chord Subs (Gemini API)];
+    B -- API Call --> G[Cloud Function: Lyrics Retrieval];
+    
+    H[Developer Push to Git] --> I[Cloud Build: CI/CD];
+    I -- Builds & Pushes Image --> J[Artifact Registry];
+    I -- Deploys --> B;
+    I -- Deploys --> D;
+    I -- Deploys --> E;
+    I -- Deploys --> F;
+    I -- Deploys --> G;
+
+    subgraph "Google Cloud Platform"
+        B
+        C
+        D
+        E
+        F
+        G
+        J
+        direction LR
+    end
+```
+
+---
+
+## Quickstart & Deployment
+
+This project is designed to be deployed on Google Cloud Platform.
+
+**Prerequisites:**
+
+1.  **Google Cloud SDK:** Install and initialize the `gcloud` CLI. ([Installation Guide](https://cloud.google.com/sdk/docs/install))
+2.  **Google Cloud Project:** Have a GCP project created with billing enabled (though we aim for free tier usage where possible).
+    *   Enable necessary APIs: Cloud Run, Vertex AI, Cloud Functions, Cloud Build, Artifact Registry, Cloud Storage, Secret Manager.
+3.  **Docker:** Installed locally if you wish to build images locally before pushing.
+4.  **Git:** For cloning the repository.
+
+**Deployment Steps (High-Level):**
+
+1.  **Clone the Repository:**
+    ```bash
+    git clone https://github.com/blairmichaelg/Acoustical.git
+    cd Acoustical
+    ```
+2.  **Configure GCP Project:**
+    *   Set your GCP Project ID in `cloudbuild.yaml` and any other relevant configuration files (e.g., for service account permissions if needed).
+    *   Store any required API keys (e.g., for external lyrics APIs, Gemini API key) in **Google Secret Manager**. Update the application to fetch secrets from there.
+3.  **Build and Deploy Services using Cloud Build:**
+    *   The primary method for deployment will be via `cloudbuild.yaml`. Trigger a build:
+        ```bash
+        gcloud builds submit --config cloudbuild.yaml .
+        ```
+    *   This will:
+        *   Build Docker images for the web app (Cloud Run) and Vertex AI custom prediction routines (Essentia, Magenta).
+        *   Push images to Artifact Registry.
+        *   Deploy the web app to Cloud Run.
+        *   Deploy models/predictors to Vertex AI Endpoints.
+        *   Deploy Cloud Functions.
+        *(Specific `cloudbuild.yaml` steps will need to be created for each service deployment beyond the initial Essentia container).*
+4.  **Access the Web Application:**
+    *   Once deployed, Cloud Run will provide a URL for the web application.
+
+**(Local Development Note):** For local development, you might run the Flask app locally and configure it to point to deployed GCP services (Vertex AI, Cloud Functions). Alternatively, emulators for some services (like Firestore, Pub/Sub - though not heavily used yet) can be used. Direct local execution of all backends will become secondary to the cloud-deployed versions.
+
+---
+
+## Features
+
+*   **Intelligent Chord Extraction (via Vertex AI):** Get chords from any audio file or direct URL, processed by a scalable Essentia backend on Vertex AI.
+*   **Lyrics Retrieval (via Cloud Functions):** Fetch lyrics for songs, potentially orchestrated by Cloud Functions.
+*   **Key Detection & Transposition:** Analyze song key and easily transpose chords.
+*   **Capo Recommendation:** Get smart capo suggestions.
+*   **Creative Flourish Generation (via Vertex AI & Cloud Functions):**
+    *   **Magenta:** Generate musical embellishments using Magenta models hosted on Vertex AI.
+    *   **LLM-Powered:** Get chord substitution ideas via Google's Gemini API, orchestrated by a Cloud Function.
+    *   **Rule-Based:** (Can still run within the Cloud Run service or be a separate function).
+*   **CLI & Web App Interfaces:** Interact with the tool via a user-friendly web interface (hosted on Cloud Run) or a CLI (which can be adapted to call the cloud APIs).
+
+---
+## Known Issues
+
+*   Initial setup and configuration of GCP services require familiarity with Google Cloud.
+*   Costs can be incurred if services scale beyond free tiers or if long-running instances are accidentally configured for Vertex AI endpoints (aim for scale-to-zero).
+*   Network latency between services if not configured optimally (e.g., ensure services are in the same region).
+*   Dependencies for specific models (Essentia, Magenta) are managed within their respective Docker containers for Vertex AI, simplifying the web app's direct dependencies.
+
+---
+## How to Add a New Backend/Plugin
+
+While the original plugin system for local backends exists, for cloud-deployed features:
+
+*   **New Chord Extraction Models:** Would typically involve creating a new custom prediction routine (Dockerfile, predictor.py) for Vertex AI, deploying it, and updating the web app to call the new endpoint.
+*   **New Flourish Engines (AI-based):** Similar to above, deploy the model to Vertex AI or create a Cloud Function to interface with an external AI API.
+*   **Rule-Based Logic:** Can still be added as Python modules within the Cloud Run service or deployed as separate Cloud Functions.
+
+---
+## Usage
+
+### Web App (Primary Interface)
+
+*   Access the application via the URL provided by Google Cloud Run after deployment.
+*   Functionality remains similar: upload audio or paste a URL, extract chords, retrieve lyrics, transpose, capo, flourish, and download results. All backend processing is now handled by GCP services.
+
+### CLI (Can be adapted)
+
+*   The CLI (`cli/cli.py`) can be updated to make API calls to the deployed Cloud Run web app endpoints or directly to other GCP services (e.g., Vertex AI endpoints if secured appropriately). This ensures consistency between web and CLI usage.
+    *   Example (conceptual):
+        ```bash
+        # Configure CLI to point to your Cloud Run URL
+        acoustical config set api_endpoint <your-cloud-run-url>
+        
+        # Extract chords (CLI calls the cloud backend)
+        acoustical extract-chords path/to/song.mp3 
+        ```
 ---
 
 ## Audio Downloader
@@ -47,100 +185,6 @@ python audio_input/downloader.py <url> [--out_dir audio_input]
     python web_app/app.py
     ```
     Open your browser at [http://localhost:5000](http://localhost:5000)
-
----
-
-## Features
-
-*   **Intelligent Chord Extraction:** Get chords from any audio file or direct URL (YouTube, etc.).
-*   **Basic Lyrics Retrieval:** Fetch lyrics for songs using their URL or by providing title and artist.
-*   **Key Detection & Transposition:** Analyze song key and easily transpose chords to fit your vocal range or preferred key.
-*   **Capo Recommendation:** Get smart capo suggestions to simplify complex chord progressions.
-*   **Creative Flourish Generation:** Generate musical embellishments (rule-based, Magenta, GPT4All) to add your unique touch.
-*   **CLI & Web App Interfaces:** Interact with the tool via command line or a user-friendly web interface.
-*   **Extensible & Testable:** Designed for easy expansion and robust development.
-
-### Upcoming Features (See [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md))
-
-*   **Chord-Lyrics Synchronization:** Align extracted chords with lyrical lines for seamless learning and performance.
-*   **Advanced Flourish Generation:** Incorporate deeper music theory for more sophisticated and contextually aware flourishes.
-*   **Chord Substitution/Reharmonization:** Suggest alternative chords to creatively modify existing progressions.
-*   **Intelligent Fingering Advisor:** Recommend optimal guitar fingerings for chords and progressions, considering ease and flow.
-
----
-
-## Known Issues
-
-*   Some dependencies (essentia, magenta, aubio) are difficult to install on Windows.
-*   Chordino is not supported on Windows.
-*   Large or corrupt audio files may cause extraction to fail or timeout.
-*   See [GitHub Issues](https://github.com/blairmichaelg/Acoustical/issues) for up-to-date bug reports and workarounds.
-
-## How to Add a New Backend/Plugin
-
-Chord extraction supports plugins and fallback logic. Built-in backends (Chordino, autochord, chord-extractor) are tried in order; if all fail, registered plugins are tried in order.
-
-1.  **Write a function** that takes `audio_path` and returns a list of `{"time": float, "chord": str}` dicts.
-2.  **Register it:**
-    ```python
-    from chord_extraction import register_chord_extraction_backend
-
-    def my_plugin_backend(audio_path):
-        # Your extraction logic here
-        return [{"time": 0.0, "chord": "X"}, {"time": 1.0, "chord": "Y"}]
-
-    register_chord_extraction_backend(my_plugin_backend)
-    ```
-3.  **Test your plugin** with the CLI, web app, or `get_chords()`.
-
----
-
-## Usage
-
-### CLI
-
-*   Run `python cli/cli.py --help` for all options and subcommands.
-*   **Example commands:**
-    ```bash
-    # Extract chords from a local audio file
-    python cli/cli.py extract-chords path/to/song.mp3
-
-    # Extract chords from a YouTube URL
-    python cli/cli.py extract-chords "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-
-    # Batch extract chords from all audio files in a local directory
-    python cli/cli.py extract-chords path/to/audio/directory --batch
-
-    # Get lyrics for a song by URL
-    python cli/cli.py get-lyrics --url "https://www.youtube.com/watch?v=..."
-
-    # Get lyrics for a song by title and artist
-    python cli/cli.py get-lyrics --title "Bohemian Rhapsody" --artist "Queen"
-
-    # Transpose chords from a JSON file
-    python cli/cli.py transpose chords.json --semitones +2
-
-    # Recommend capo position
-    python cli/cli.py capo chords.json
-
-    # Generate flourishes
-    python cli/cli.py flourish chords.json --magenta
-
-    # Check backend availability
-    python cli/cli.py check-backends
-    ```
-*   Use `--list-backends` to see available backends.
-*   Use `--version` to print version info.
-
-### Web App
-
-*   Upload audio or paste a URL, extract chords, retrieve lyrics, transpose, capo, flourish, and download results.
-*   **Chord Extraction:** Use the "Audio URL" field for direct URL input, or "Audio File" for local files.
-*   **Batch Extraction:** Use the "Batch Audio Files" input to upload and process multiple local audio files at once.
-*   **Lyrics Retrieval:** Use the "Audio URL" field for YouTube/Spotify links, or provide "Song Title" and "Artist" to fetch lyrics.
-*   Flourish method: Choose between rule-based, Magenta, or GPT4All for flourish generation.
-*   Keyboard navigation and accessibility supported.
-*   Click "Report Bug / Feedback" in the footer to open a GitHub issue.
 
 ---
 

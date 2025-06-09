@@ -7,9 +7,9 @@ from cli.commands.capo import capo
 from cli.commands.flourish import flourish
 from cli.commands.key import key
 from cli.commands.check_backends import check_backends
-from cli.commands.download_audio import download_audio_cli
-from cli.commands.get_lyrics import get_lyrics_cli
-from cli.commands.fingering import fingering_cli # Added new command
+from cli.commands.download_audio import download_audio_command
+from cli.commands.get_lyrics import get_lyrics_command
+from cli.commands.fingering import fingering_command
 
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
@@ -27,9 +27,9 @@ cli.add_command(capo)
 cli.add_command(flourish)
 cli.add_command(key)
 cli.add_command(check_backends)
-cli.add_command(download_audio_cli)
-cli.add_command(get_lyrics_cli)
-cli.add_command(fingering_cli) # Added new command
+cli.add_command(download_audio_command)
+cli.add_command(get_lyrics_command)
+cli.add_command(fingering_command)
 
 
 if __name__ == "__main__":

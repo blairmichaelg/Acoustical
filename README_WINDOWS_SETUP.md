@@ -6,10 +6,11 @@ Ensure you have Python 3.11 installed. Activate the virtual environment:
 ```pwsh
 & c:\Users\Michael\acoustical\acp.venv\Scripts\Activate.ps1
 ```
-Install required Python packages:
+Install core Python packages:
 ```pwsh
 pip install -r requirements.txt
 ```
+For optional, enhanced features (like advanced chord extraction or flourish generation), refer to `DEPENDENCY_INSTALLATION.md`.
 
 ## 2. Download GPT4All Model
 
@@ -28,9 +29,8 @@ Access the app at `http://127.0.0.1:5000`.
 ## 4. Troubleshooting
 
 - **Missing GPT4All Model:** Ensure the `.bin` file is in the correct location.
-- **Dependency Issues:** Run `pip install gpt4all` manually if needed.
-- **Magenta Errors:** Magenta is not supported on Windows. Use WSL/Linux for Magenta-based features.
+- **Dependency Issues:** Refer to `DEPENDENCY_INSTALLATION.md` for detailed troubleshooting and installation instructions for optional dependencies.
 
 ## 5. Optional: Set Up WSL
 
-For full functionality (Magenta, chord extraction), install [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) and set up the project in a Linux environment.
+For full functionality, especially for optional dependencies that are challenging to install on native Windows (e.g., Essentia, Magenta), consider installing [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) and setting up the project in a Linux environment within WSL.

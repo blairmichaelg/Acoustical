@@ -1,6 +1,6 @@
 import logging
 from typing import List, Dict, Any  # Removed Tuple as it's not directly used
-import difflib
+# import difflib # Not used yet
 
 log = logging.getLogger(__name__)
 
@@ -100,49 +100,56 @@ def identify_song_structure(
         "solo": ["solo", "guitar solo", "instrumental"]
     }
 
-    section_counter = {"verse": 0, "chorus": 0, "bridge": 0}
-    potential_sections = {}
+    section_counter = {"verse": 0, "chorus": 0, "bridge": 0, "intro": 0, "outro": 0, "solo": 0}
+    # No need for potential_sections with the new direct iteration logic
+
+    last_added_line_index = -1 # To avoid adding multiple sections for multi-line keyword phrases
 
     for i, line in enumerate(lines):
+        if i <= last_added_line_index: # If this line was part of a multi-line keyword phrase already processed
+            continue
+
         line_lower = line.lower()
-        detected_type = None
-
-        for section_type, keywords in section_keywords.items():
-            if any(keyword in line_lower for keyword in keywords):
-                detected_type = section_type
-                break
-
-        if detected_type:
-            if detected_type not in potential_sections:
-                potential_sections[detected_type] = []
-            potential_sections[detected_type].append(i)
-
-    # Analyze potential sections for repetition
-    for section_type, line_indices in potential_sections.items():
-        # For simplicity, just take the first occurrence for now
-        # A more sophisticated approach would analyze repetition and similarity
-        if section_type == "verse":
-            section_counter["verse"] += 1
-            section_name = f"Verse {section_counter['verse']}"
-        elif section_type == "chorus":
-            section_counter["chorus"] += 1
-            section_name = f"Chorus {section_counter['chorus']}"
-        elif section_type == "bridge":
-            section_counter["bridge"] += 1
-            section_name = f"Bridge {section_counter['bridge']}"
-        else:
-            section_name = section_type.capitalize()
-
-        section_start_time = line_indices[0] * time_per_line
-        closest_chord_time = section_start_time
-        if chords:
-            # Find the first chord that is at or after the estimated line start time
-            for chord_entry in chords:
-                if chord_entry.get("time", 0.0) >= section_start_time:
-                    closest_chord_time = chord_entry.get("time", section_start_time)
+        detected_section_type = None
+        
+        # Check for keywords. Order might matter if a line could match multiple types.
+        # A simple priority could be intro/outro > chorus > verse > bridge > solo
+        # For now, using the dict order of section_keywords.
+        for sec_type, keywords in section_keywords.items():
+            for keyword in keywords:
+                if keyword in line_lower:
+                    detected_section_type = sec_type
+                    # Potentially advance last_added_line_index if keyword spans multiple lines
+                    # (e.g. "guitar\nsolo"). For now, assume keywords are on single lines.
                     break
+            if detected_section_type:
+                break
+        
+        if detected_section_type:
+            section_name = ""
+            # Types that should be numbered if they appear multiple times
+            numbered_types = {"verse", "chorus", "bridge"} 
+            
+            if detected_section_type in numbered_types:
+                section_counter[detected_section_type] += 1
+                section_name = f"{detected_section_type.capitalize()} {section_counter[detected_section_type]}"
+            else: # For intro, outro, solo - use capitalized type name directly (no number)
+                  # and don't increment their counters in section_counter for naming purposes.
+                section_name = detected_section_type.capitalize()
+                # If we wanted "Intro 1", "Solo 1", we'd use the counter like for verses.
+                # The tests currently expect unnumbered for these.
+                # section_counter[detected_section_type] += 1 # Only if we want to count occurrences
 
-        structure.append({"type": section_name, "start_time": closest_chord_time})
+            section_start_time_est = i * time_per_line
+            closest_chord_time = section_start_time_est
+            if chords:
+                for chord_entry in chords:
+                    if chord_entry.get("time", 0.0) >= section_start_time_est:
+                        closest_chord_time = chord_entry.get("time", section_start_time_est)
+                        break
+            
+            structure.append({"type": section_name, "start_time": closest_chord_time})
+            last_added_line_index = i # Mark this line as processed for section start
 
     if not structure and lines:  # Fallback if no structure found
         structure.append({"type": "Song", "start_time": 0.0})

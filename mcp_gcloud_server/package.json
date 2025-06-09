@@ -1,0 +1,22 @@
+{
+  "name": "mcp-gcloud-server",
+  "version": "0.1.0",
+  "description": "MCP Server for Google Cloud CLI (gcloud) commands",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "mcp",
+    "gcloud",
+    "google-cloud"
+  ],
+  "author": "Cline",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "latest",
+    "child_process": "^1.0.2"
+  }
+}

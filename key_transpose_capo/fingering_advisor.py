@@ -76,7 +76,7 @@ def score_shape_playability(shape: ChordShape, fretboard: Fretboard) -> int:
 def suggest_fingerings(
     chord_str: str,
     fretboard: Optional[Fretboard] = None
-) -> List[ChordShape]:
+) -> List[Tuple[ChordShape, int]]: # Changed return type to include score
     log.info(f"Suggesting fingerings for chord: {chord_str}")
     if fretboard is None:
         fretboard = Fretboard()
@@ -138,16 +138,17 @@ def suggest_fingerings(
         scored_shapes.append((shape, score))
 
     scored_shapes.sort(key=lambda item: item[1])
-    final_suggestions = [shape for shape, score in scored_shapes]
+    # Return the shapes along with their scores
+    final_suggestions_with_scores = scored_shapes
 
-    if not final_suggestions:
+    if not final_suggestions_with_scores:
         log.info(f"No fingerings found for {chord_str}.")
-    elif scored_shapes:
+    elif final_suggestions_with_scores:
         log.info(
-            f"Found {len(final_suggestions)} fingerings for {chord_str}, "
-            f"best score: {scored_shapes[0][1]}"
+            f"Found {len(final_suggestions_with_scores)} fingerings for {chord_str}, "
+            f"best score: {final_suggestions_with_scores[0][1]}"
         )
-    return final_suggestions
+    return final_suggestions_with_scores
 
 
 if __name__ == '__main__':
@@ -156,10 +157,10 @@ if __name__ == '__main__':
     chords_to_test = ["C", "Gmaj", "Am", "Emin", "D7", "F#maj", "Bb", "Cmaj7", "Gm7", "F", "Bm"]
     for chord_test_str in chords_to_test:
         print(f"\n--- Testing: {chord_test_str} ---")
-        suggestions = suggest_fingerings(chord_test_str, fretboard=fretboard_instance)
-        if suggestions:
-            for i, shape_sugg in enumerate(suggestions):
-                print(f"  Suggestion {i+1}: {shape_sugg.name}") 
+        suggestions_with_scores = suggest_fingerings(chord_test_str, fretboard=fretboard_instance)
+        if suggestions_with_scores:
+            for i, (shape_sugg, score) in enumerate(suggestions_with_scores):
+                print(f"  Suggestion {i+1}: {shape_sugg.name}, Score: {score}") 
                 print(f"     Fingerings: {shape_sugg.fingerings}")
         else:
             print(f"  No suggestions found for {chord_test_str}")

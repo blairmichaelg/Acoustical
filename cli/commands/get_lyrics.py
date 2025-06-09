@@ -1,15 +1,17 @@
 import click
 import sys
 from common.utils import format_error, serialize_result
-from lyrics_analysis.lyrics_retriever import get_lyrics_from_url_or_metadata, parse_azlyrics_html
+from lyrics_analysis.lyrics_retriever import get_lyrics_from_url_or_metadata
 
-@click.command()
+
+@click.command("get-lyrics")
 @click.option(
-    '--url', type=str, help='URL of the song (e.g., YouTube URL) to retrieve lyrics for.'
+    '--url', type=str,
+    help='URL of the song (e.g., YouTube) to retrieve lyrics for.'
 )
 @click.option('--title', type=str, help='Title of the song.')
 @click.option('--artist', type=str, help='Artist of the song.')
-async def get_lyrics_cli(url, title, artist):
+def get_lyrics_command(url, title, artist):  # Removed async
     """
     Retrieve lyrics for a song using a URL or by providing title and artist.
     """
@@ -24,53 +26,48 @@ async def get_lyrics_cli(url, title, artist):
             )
             sys.exit(1)
 
-        lyrics_info = get_lyrics_from_url_or_metadata(url=url, title=title, artist=artist)
+        lyrics_info = get_lyrics_from_url_or_metadata(
+            url=url, title=title, artist=artist
+        )
 
-        if lyrics_info["method"] == "scrape_azlyrics":
-            try:
-                # The agent will inject the `use_mcp_tool` function.
-                html_content = await use_mcp_tool(  # pylint: disable=undefined-variable
-                    server_name="github.com/zcaceres/fetch-mcp",
-                    tool_name="fetch_html",
-                    arguments={"url": lyrics_info["url"]}
-                )
-                lyrics_text = parse_azlyrics_html(
-                    html_content, lyrics_info["title"], lyrics_info["artist"]
-                )
-                if lyrics_text:
-                    click.echo(
-                        serialize_result({"lyrics": lyrics_text, "source": "azlyrics.com"})
-                    )
-                else:
-                    click.echo(
-                        format_error(
-                            "Failed to retrieve lyrics from AZLyrics.",
-                            "Could not parse lyrics from the page."
-                        ),
-                        err=True
-                    )
-                    sys.exit(1)
-            except Exception as e:
-                click.echo(format_error("Error fetching lyrics from AZLyrics.", e), err=True)
-                sys.exit(1)
-        elif lyrics_info["method"] == "placeholder_url":
+        # Simplified logic: get_lyrics_from_url_or_metadata should handle
+        # fetching or return placeholders.
+        # No direct MCP tool interaction from CLI for now.
+        if lyrics_info.get("lyrics_text"):  # Safely check if lyrics_text exists
+            source = lyrics_info.get("method", "unknown")
+            payload = {
+                "lyrics": lyrics_info["lyrics_text"],
+                "source": source
+            }
+            click.echo(serialize_result(payload))
+        elif lyrics_info.get("method") == "scrape_azlyrics":
+            # This CLI command currently does not fetch/parse from AZLyrics.
+            # It only prepares the URL.
+            msg_main = "AZLyrics retrieval not implemented in CLI."
+            prepared_url = lyrics_info.get('url', 'N/A')
+            msg_detail = (
+                f"Prepared URL: {prepared_url}. "
+                "Manual fetching/parsing needed."
+            )
+            full_error_message = f"{msg_main} {msg_detail}"
+            click.echo(format_error(full_error_message), err=True)
+            sys.exit(1)
+        elif lyrics_info.get("method") == "placeholder_url":
             lyrics_text = (
                 f"Lyrics for song from URL: {lyrics_info['url']}\n\n"
                 "(Placeholder lyrics: Verse 1...\nChorus...\nVerse 2...)"
             )
-            click.echo(
-                serialize_result({"lyrics": lyrics_text, "source": "placeholder_url"})
-            )
+            payload = {"lyrics": lyrics_text, "source": "placeholder_url"}
+            click.echo(serialize_result(payload))
         else:
-            click.echo(
-                format_error(
-                    "Unknown lyrics retrieval method.",
-                    f"Method: {lyrics_info['method']}"
-                ),
-                err=True
-            )
+            method_info = lyrics_info.get('method', 'N/A')
+            msg_main = "Unknown lyrics retrieval method or no lyrics found."
+            msg_detail = f"Method: {method_info}"
+            click.echo(format_error(msg_main, msg_detail), err=True)
             sys.exit(1)
 
     except Exception as e:
-        click.echo(format_error("An unexpected error occurred during lyrics retrieval", e), err=True)
+        msg_main = "An unexpected error occurred during lyrics retrieval."
+        # Here, 'e' is a genuine Exception object, so passing it as exc is correct.
+        click.echo(format_error(msg_main, exc=e), err=True)
         sys.exit(1)

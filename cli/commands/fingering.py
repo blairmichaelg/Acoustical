@@ -1,5 +1,6 @@
 import click
 import logging
+import sys # Added sys import
 from typing import List, Optional # Added Optional
 from key_transpose_capo.fingering_advisor import suggest_fingerings, score_shape_playability
 from music_theory.fretboard import Fretboard
@@ -18,7 +19,7 @@ log = logging.getLogger(__name__)
     "--tuning", "-t", type=str, default=None,
     help="Custom tuning, e.g., DADGBe. Comma-separated."
 )
-def fingering_cli(chord_string: str, num_suggestions: int, tuning: Optional[str]):
+def fingering_command(chord_string: str, num_suggestions: int, tuning: Optional[str]): # Renamed function
     """
     Suggests guitar fingerings for a given CHORD_STRING.
     """
@@ -29,9 +30,9 @@ def fingering_cli(chord_string: str, num_suggestions: int, tuning: Optional[str]
             log.info(f"Using custom tuning: {fretboard_tuning}")
 
         fb = Fretboard(tuning=fretboard_tuning)
-        suggestions = suggest_fingerings(chord_string, fretboard=fb)
+        suggestions_with_scores = suggest_fingerings(chord_string, fretboard=fb)
 
-        if not suggestions:
+        if not suggestions_with_scores:
             click.echo(
                 format_error(
                     f"No fingerings found for '{chord_string}'.",
@@ -41,17 +42,13 @@ def fingering_cli(chord_string: str, num_suggestions: int, tuning: Optional[str]
             return
 
         output_suggestions = []
-        for i, shape in enumerate(suggestions):
+        for i, (shape, score) in enumerate(suggestions_with_scores):
             if i >= num_suggestions:
                 break
-            # Recalculate score for display consistency
-            score = score_shape_playability(shape, fb)
             output_suggestions.append({
                 "name": shape.name,
-                # This is the actual root after transposition
                 "root": shape.template_root_note_str,
                 "type": shape.chord_type,
-                # Actual base/barre fret
                 "base_fret": shape.base_fret_of_template,
                 "fingerings": shape.fingerings,
                 "score": score,
@@ -70,3 +67,4 @@ def fingering_cli(chord_string: str, num_suggestions: int, tuning: Optional[str]
             format_error(f"Failed to suggest fingerings for '{chord_string}'.", e),
             err=True
         )
+        sys.exit(1)

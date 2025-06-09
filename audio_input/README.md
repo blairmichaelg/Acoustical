@@ -4,10 +4,10 @@ This directory is used to store audio files for processing by the Acoustic Cover
 
 ## Contents
 
-*   **Sample Audio Files:** Place `.mp3`, `.wav`, `.flac`, or other supported audio files here for local chord extraction and testing.
-*   **Downloaded Audio:** When using the web app or CLI to extract chords from a URL, audio files will be temporarily downloaded to a temporary directory managed by the application, not directly into this folder. This directory is primarily for user-provided local files or for development/testing purposes.
+*   **Sample Audio Files:** Place `.mp3`, `.wav`, `.flac`, or other supported audio files (see project configuration for a full list) here for local chord extraction and testing.
+*   **Downloaded Audio:** The `audio_input/downloader.py` script, by default, saves downloaded audio into this `audio_input` directory (or a specified output path). The web application might use a system temporary directory for downloads. This `audio_input` directory can serve as a default location for downloaded files or for user-provided local files.
 
 ## Usage
 
-*   **Local Files:** To process a local audio file, place it in this directory (or any other accessible path) and provide its path to the CLI or upload it via the web app.
-*   **URL Input:** For seamless processing of audio from YouTube or other online sources, simply provide the URL directly to the chord extraction feature in the web app or CLI. The application will handle the temporary download.
+*   **Local Files:** To process a local audio file, you can place it in this directory and provide its path (e.g., `audio_input/my_song.mp3`) to the CLI, or upload it via the web app.
+*   **URL Input:** When providing a URL (e.g., YouTube) to the CLI's download command or the web app, the audio will be downloaded. The CLI's download command defaults to saving in this `audio_input` directory unless a different output directory is specified.

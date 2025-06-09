@@ -70,7 +70,9 @@ def check_audio_file(filepath: str) -> bool:
     if not os.path.isfile(filepath):
         raise ValueError(f"File does not exist: {filepath}")
     if not is_allowed_audio_file(filepath):
-        raise ValueError(f"Unsupported file type: {filepath}. Allowed types: {', '.join(ALLOWED_EXTENSIONS)}")
+        # Sort extensions for consistent error message
+        sorted_extensions = sorted(list(ALLOWED_EXTENSIONS))
+        raise ValueError(f"Unsupported file type: {filepath}. Allowed types: {', '.join(sorted_extensions)}")
     if not is_valid_audio_mime(filepath):
         raise ValueError(f"Invalid audio MIME type for file: {filepath}")
     if not is_file_size_ok(filepath):

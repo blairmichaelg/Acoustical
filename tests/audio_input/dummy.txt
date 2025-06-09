@@ -1,5 +1,0 @@
-# Another dummy audio file for testing
-# Duration: 3.0s
-# Format: Text (simulated audio)
-#
-# Used for backend fallback testing

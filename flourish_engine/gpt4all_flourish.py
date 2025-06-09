@@ -14,8 +14,12 @@ except ImportError:
 
 log = logging.getLogger(__name__)
 
-# Ensure this path is correct or make it configurable
-DEFAULT_MODEL_PATH = "c:\\Users\\Michael\\acoustical\\ggml-gpt4all-j-v1.3-groovy.bin"
+# Model path should be sourced from config.py or environment variable
+try:
+    from config import GPT4ALL_MODEL_PATH as DEFAULT_MODEL_PATH
+except ImportError:
+    log.warning("GPT4ALL_MODEL_PATH not found in config.py. GPT4All functionality might be limited if path not provided.")
+    DEFAULT_MODEL_PATH = None
 
 
 def suggest_chord_substitutions(
@@ -52,8 +56,22 @@ def suggest_chord_substitutions(
         return results
 
     actual_model_path = model_path or DEFAULT_MODEL_PATH
+    if not actual_model_path:
+        log.error("GPT4All model path is not configured. Cannot load model.")
+        results = []
+        for chord_obj in chord_progression:
+            c = chord_obj.get("chord", "N/A")
+            results.append({
+                "original_chord": c,
+                "start_time": chord_obj.get("time"),
+                "suggestions": [f"{c}7", f"{c}add9"] if c != "N/A" else [] 
+            })
+        return results
+        
     try:
+        log.info(f"Attempting to load GPT4All model from: {actual_model_path}")
         model = GPT4All(actual_model_path)
+        log.info("GPT4All model loaded successfully.")
     except Exception as e:
         log.error(f"Failed to load GPT4All model from {actual_model_path}: {e}")
         results = []
@@ -66,7 +84,6 @@ def suggest_chord_substitutions(
             })
         return results
 
-    # Detect overall key for context
     original_chord_strings = [c.get("chord", "") for c in chord_progression]
     detected_key_info = detect_key_from_chords(original_chord_strings)
     key_root_str = detected_key_info.get("key_root")
@@ -99,36 +116,84 @@ def suggest_chord_substitutions(
             f"7th, 9th, sus, or a related minor/major chord). "
             f"Be concise. Examples: G7, Am7, Csus4. "
         )
-        # Consider removing lyrics or making it a very optional, light context
-        # if lyrics:
-        #     prompt += f"Consider the lyrical context if relevant: \"{lyrics[:50]}...\""
 
         try:
-            # Using a context manager for the chat session is good practice
             with model.chat_session():
                 response = model.generate(
                     prompt, max_tokens=max_tokens, temp=0.7, top_k=40, top_p=0.9
                 )
 
-            # Basic response cleaning
-            raw_suggestions = response.strip().replace("Sure, here are some suggestions:", "")
-            raw_suggestions = raw_suggestions.replace("Here's a suggestion:", "")
-            potential_suggestions = re.split(r'[,\n\r\t\.\-]| or | and ', raw_suggestions)
+            text_to_parse = response.strip()
+            
+            # 1. Remove global introductory phrases iteratively
+            global_intro_phrases = [
+                "Sure, here are some suggestions:", "Here's a suggestion:", 
+                "Okay, how about" 
+            ]
+            active_text = text_to_parse
+            made_change_in_pass = True
+            while made_change_in_pass:
+                made_change_in_pass = False
+                for phrase in global_intro_phrases:
+                    match = re.match(f"^{re.escape(phrase)}\s*[:,]?\s*", active_text, re.IGNORECASE)
+                    if match:
+                        active_text = active_text[match.end():].strip()
+                        made_change_in_pass = True
+                        break 
+            text_to_parse = active_text
+            
+            # 2. Normalize conjunctions and primary delimiters (newline, comma) to a single unique delimiter (e.g., pipe)
+            text_to_parse = re.sub(r'\s+(?:or|and)\s+', '|', text_to_parse, flags=re.IGNORECASE)
+            text_to_parse = re.sub(r'[\n\r\t,]+', '|', text_to_parse) # Newlines and commas to pipe
+            text_to_parse = re.sub(r'[|]+', '|', text_to_parse) # Consolidate multiple pipes
+            
+            # Now split by the pipe. Then, each part might still contain space-separated chords.
+            parts_from_pipe_split = text_to_parse.split('|')
+            
+            potential_suggestions_final = []
+            for part in parts_from_pipe_split:
+                # Split parts that might be space-separated chords, e.g., "C G Am"
+                space_separated_sub_parts = re.split(r'\s+', part.strip())
+                potential_suggestions_final.extend(p for p in space_separated_sub_parts if p)
 
             cleaned_suggestions = set()
-            for s in potential_suggestions:
-                s_cleaned = s.strip()
-                # Regex to match common chord patterns (simplistic but better than nothing)
-                if s_cleaned and re.match(
-                    r"^[A-G][#b]?(maj|m|min|dim|aug|sus|add|\d)*[#b\d]*$",
-                    s_cleaned,
-                    re.IGNORECASE
-                ):
-                    cleaned_suggestions.add(s_cleaned)
+            item_intro_phrases = ["Try", "Maybe", "Consider", "Perhaps", "How about", "What about", "An option is", "Another option is", "Or perhaps"] 
+            trailing_punctuation = ".?!\"'"
+            
+            for part_to_clean in potential_suggestions_final: # Iterate over the fully split parts
+                s_processed = part_to_clean.strip()
+                if not s_processed: continue
 
-            if not cleaned_suggestions and current_chord_str: # Fallback
+                # 3. Remove item-specific leading phrases iteratively for each part
+                active_s_part = s_processed
+                made_item_change = True
+                while made_item_change:
+                    made_item_change = False
+                    original_len = len(active_s_part)
+                    for phrase in item_intro_phrases:
+                        match = re.match(f"^{re.escape(phrase)}\s*[:,]?\s*", active_s_part, re.IGNORECASE)
+                        if match:
+                            active_s_part = active_s_part[match.end():].strip()
+                            if len(active_s_part) < original_len:
+                                made_item_change = True
+                            break 
+                    if not made_item_change: # No phrase removed in this pass for this item
+                        break
+                s_processed = active_s_part
+
+                # 4. Remove common trailing punctuation
+                if s_processed and s_processed[-1] in trailing_punctuation:
+                    s_processed = s_processed[:-1].strip()
+                
+                # 5. Validate with regex
+                chord_pattern = r"^[A-G][#b]?([\w\d#b\+\-\(\)]*)(/([A-G][#b]?))?$"
+                if s_processed and re.fullmatch(chord_pattern, s_processed, re.IGNORECASE):
+                    cleaned_suggestions.add(s_processed)
+                elif s_processed: 
+                    log.debug(f"Filtered out potential non-chord suggestion: '{s_processed}' from original part: '{part_to_clean}'")
+
+            if not cleaned_suggestions and current_chord_str: 
                 cleaned_suggestions.add(current_chord_str)
-
 
             llm_results.append({
                 "original_chord": current_chord_str,
@@ -140,13 +205,11 @@ def suggest_chord_substitutions(
             llm_results.append({
                 "original_chord": current_chord_str,
                 "start_time": chord_obj.get("time"),
-                "suggestions": [f"{current_chord_str}sus", f"{current_chord_str}6"]  # Fallback
+                "suggestions": [f"{current_chord_str}sus", f"{current_chord_str}6"]
             })
 
     return llm_results
 
-
-# Example usage (for testing)
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     if _gpt4all_available:

@@ -1,8 +1,0 @@
-# Dummy audio file for testing
-# Duration: 5.0s
-# Format: Text (simulated audio)
-#
-# This file exists to allow tests to run without requiring
-# real audio files or audio processing dependencies.
-#
-# The actual content doesn't matter - tests just need the file to exist.

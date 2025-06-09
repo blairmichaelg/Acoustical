@@ -11,7 +11,6 @@ Example usage:
     chords = get_chords("audio_input/song.mp3")
 """
 
-from . import chordino_wrapper
 from . import autochord_util
 from . import chord_extractor_util
 from .backend_registry import _registered_plugins

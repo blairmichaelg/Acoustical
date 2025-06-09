@@ -25,3 +25,30 @@ htmlcov/
 
 # Specific to Acoustical project
 acp.venv/
+
+# Temporary/Log files
+debug.log
+*.log
+*.html
+*.mp3
+*.txt
+*.wav
+*.m4a
+
+# OS-specific files
+desktop.ini
+
+# Test data (if not part of versioned tests)
+audio_input_cli_test/
+audio_input_test/
+
+# GCloud server Python environment
+mcp_gcloud_server/Python/
+mcp_gcloud_server/node_modules/
+
+# Cache directories
+.clj-kondo/.cache/
+.lsp/.cache/
+
+# Specific virtual environment (if not already covered by venv/)
+.venv/
