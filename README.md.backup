@@ -205,8 +205,6 @@ Acoustical leverages Google Cloud Platform for scalability and AI capabilities:
 | **Artifact Registry** | Docker image storage |
 | **Secret Manager** | API key management |
 
-**Architecture Diagram:**
-
 ```mermaid
 graph TD
     A[User: Web Browser] --> B[Cloud Run: Flask Web App];
@@ -214,7 +212,7 @@ graph TD
     B -- API Call --> D[Vertex AI Endpoint: Essentia Chord Extraction];
     D -- Reads Audio From --> C;
     B -- API Call --> E[Vertex AI Endpoint: Magenta Flourishes];
-    B -- API Call --> F[Cloud Function: LLM Chord Subs Gemini API];
+    B -- API Call --> F[Cloud Function: LLM Chord Subs (Gemini API)];
     B -- API Call --> G[Cloud Function: Lyrics Retrieval];
     
     H[Developer Push to Git] --> I[Cloud Build: CI/CD];
@@ -236,6 +234,8 @@ graph TD
         direction LR
     end
 ```
+
+---
 
 ### Cloud Deployment (Optional)
 
@@ -265,192 +265,181 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed cloud architecture informati
 
 ## 📁 Project Structure
 
-```
-Acoustical/
-├── audio_input/          # Audio file handling and YouTube downloads
-├── chord_extraction/     # Chord extraction backends and registry
-├── key_transpose_capo/   # Key detection, transposition, capo logic
-├── flourish_engine/      # AI and rule-based flourish generation
-├── cli/                  # Click-based CLI commands
-│   └── commands/         # Individual CLI command modules
-├── web_app/              # Flask web application
-├── music_theory/         # Music theory utilities and fretboard modeling
-├── lyrics_analysis/      # Lyrics retrieval and chord-lyrics synchronization
-├── common/               # Shared utilities and error handling
-├── tests/                # Comprehensive test suite
-│   ├── chord_extraction/
-│   ├── flourish_engine/
-│   └── cli/
-├── data/                 # Sample data files
-├── model_deployment/     # Cloud deployment configurations
-├── config.py             # Centralized configuration
-└── Makefile              # Development commands
-```
+*   Initial setup and configuration of GCP services require familiarity with Google Cloud.
+*   Costs can be incurred if services scale beyond free tiers or if long-running instances are accidentally configured for Vertex AI endpoints (aim for scale-to-zero).
+*   Network latency between services if not configured optimally (e.g., ensure services are in the same region).
+*   Dependencies for specific models (Essentia, Magenta) are managed within their respective Docker containers for Vertex AI, simplifying the web app's direct dependencies.
 
 ---
+## How to Add a New Backend/Plugin
 
-## 🧪 Development
+While the original plugin system for local backends exists, for cloud-deployed features:
 
-### Running Tests
+*   **New Chord Extraction Models:** Would typically involve creating a new custom prediction routine (Dockerfile, predictor.py) for Vertex AI, deploying it, and updating the web app to call the new endpoint.
+*   **New Flourish Engines (AI-based):** Similar to above, deploy the model to Vertex AI or create a Cloud Function to interface with an external AI API.
+*   **Rule-Based Logic:** Can still be added as Python modules within the Cloud Run service or deployed as separate Cloud Functions.
 
-```bash
-# Run all tests
-make test
+---
+## Usage
 
-# Run tests with coverage
-make coverage
+### Web App (Primary Interface)
 
-# Run specific test file
-pytest tests/chord_extraction/test_backend_registry.py
+*   Access the application via the URL provided by Google Cloud Run after deployment.
+*   Functionality remains similar: upload audio or paste a URL, extract chords, retrieve lyrics, transpose, capo, flourish, and download results. All backend processing is now handled by GCP services.
+
+### CLI (Can be adapted)
+
+*   The CLI (`cli/cli.py`) can be updated to make API calls to the deployed Cloud Run web app endpoints or directly to other GCP services (e.g., Vertex AI endpoints if secured appropriately). This ensures consistency between web and CLI usage.
+    *   Example (conceptual):
+        ```bash
+        # Configure CLI to point to your Cloud Run URL
+        acoustical config set api_endpoint <your-cloud-run-url>
+        
+        # Extract chords (CLI calls the cloud backend)
+        acoustical extract-chords path/to/song.mp3 
+        ```
+---
+
+## Audio Downloader
+
+You can download audio from YouTube and other sites using the built-in downloader (requires `yt-dlp`):
+
+**Install yt-dlp:**
+```
+pip install yt-dlp
 ```
 
-### Code Quality
-
-```bash
-# Format code
-make format
-
-# Lint code
-make lint
-
-# Type checking
-mypy .
-
-# Check backend availability
-make check-backends
-```
-
-### Adding a New Backend
-
-Acoustical's plugin architecture makes it easy to add new chord extraction or flourish backends:
-
+**Python usage:**
 ```python
-from chord_extraction.backend_registry import ChordExtractionBackend, register_backend
-
-class MyCustomBackend(ChordExtractionBackend):
-    name = "my_backend"
-    
-    @classmethod
-    def is_available(cls) -> bool:
-        # Check if backend dependencies are installed
-        return True
-    
-    @classmethod
-    def extract_chords(cls, audio_path: str):
-        # Your extraction logic here
-        return [{"time": 0.0, "chord": "C"}]
-
-# Register the backend
-register_backend(MyCustomBackend)
+from audio_input.downloader import download_audio
+download_audio("https://www.youtube.com/watch?v=...", out_dir="audio_input")
 ```
 
-For cloud-deployed backends, create a custom prediction routine for Vertex AI or a Cloud Function.
-
----
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details on:
-
-- Setting up your development environment
-- Coding standards and style guide
-- Testing requirements
-- Pull request process
-
-### Good First Issues
-
-Looking to contribute? Check out issues labeled [`good first issue`](https://github.com/blairmichaelg/Acoustical/labels/good%20first%20issue) in our issue tracker.
-
-### Code of Conduct
-
-This project adheres to a [Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code.
-
----
-
-## 📚 Documentation
-
-- [**ARCHITECTURE.md**](ARCHITECTURE.md) - Detailed system architecture and design decisions
-- [**CONTRIBUTING.md**](CONTRIBUTING.md) - Contribution guidelines and development workflow
-- [**CODE_OF_CONDUCT.md**](CODE_OF_CONDUCT.md) - Community guidelines and standards
-- [**DEVELOPMENT_PLAN.md**](DEVELOPMENT_PLAN.md) - Roadmap and future features
-- [**DEPENDENCY_INSTALLATION.md**](DEPENDENCY_INSTALLATION.md) - Platform-specific installation guides
-- [**README_WINDOWS_SETUP.md**](README_WINDOWS_SETUP.md) - Windows-specific setup instructions
-
----
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-**Backend not available:**
-```bash
-python check_backends.py
+**Command-line usage:**
 ```
-This will diagnose which chord extraction backends are properly installed.
-
-**Missing dependencies:**
-- See `requirements.txt` and install only what you need
-- For Essentia on Windows, see [README_WINDOWS_SETUP.md](README_WINDOWS_SETUP.md)
-- For optional dependencies, uncomment relevant lines in requirements files
-
-**Audio download issues:**
-```bash
-pip install --upgrade yt-dlp
+python audio_input/downloader.py <url> [--out_dir audio_input]
 ```
 
-**Need help?**
-- Check our [Issue Tracker](https://github.com/blairmichaelg/Acoustical/issues)
-- Review existing [Discussions](https://github.com/blairmichaelg/Acoustical/discussions)
-- Open a new issue with detailed steps to reproduce
+## Quickstart
+
+1.  **Clone the repo and create a Python 3.11+ virtual environment.**
+2.  **Install dependencies:**
+    ```
+    pip install -r requirements.txt
+    ```
+    For advanced features (audio analysis, flourishes), uncomment optional lines in requirements.txt or use Poetry/Pipenv.
+3.  **Run tests:**
+    ```
+    make test
+    ```
+4.  **Start the web app:**
+    ```
+    python web_app/app.py
+    ```
+    Open your browser at [http://localhost:5000](http://localhost:5000)
 
 ---
 
-## 🗺️ Roadmap
+## API Usage
 
-- [ ] Enhanced chord-lyrics synchronization with NLP
-- [ ] Advanced fingering advisor with fretboard visualization
-- [ ] Support for additional audio formats and streaming sources
-- [ ] Mobile-friendly web interface
-- [ ] Collaborative features for band arrangements
-- [ ] MIDI export for DAW integration
-- [ ] Real-time audio analysis mode
+*   **Extract chords in Python (from file or URL):**
+    ```python
+    from chord_extraction import get_chords
+    chords_from_file = get_chords("audio_input/song.mp3")
+    chords_from_url = get_chords("https://www.youtube.com/watch?v=...")
+    ```
+*   **Batch extraction:**
+    ```python
+    from chord_extraction import get_chords_batch
+    results = get_chords_batch(["file1.mp3", "file2.wav"])
+    ```
+*   **Retrieve lyrics:**
+    ```python
+    # Using the web app endpoint (example, actual implementation might vary)
+    # This would typically be called from a frontend or another service
+    import requests
+    lyrics_data = requests.post("http://localhost:5000/get_lyrics", json={"url": "https://www.youtube.com/watch?v=..."}).json()
+    print(lyrics_data.get("lyrics"))
 
-See [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) for the complete roadmap.
+    # Or directly via a Python function (future implementation)
+    # from lyrics_retrieval import get_lyrics
+    # lyrics = get_lyrics(url="https://www.youtube.com/watch?v=...")
+    # lyrics = get_lyrics(title="Song Title", artist="Artist Name")
+    ```
+*   **Check backend availability:**
+    ```python
+    from chord_extraction import check_backend_availability
+    print(check_backend_availability())
+    ```
 
 ---
 
-## 📄 License
+## Troubleshooting
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+*   If a backend fails, errors are logged and reported.
+*   For missing dependencies, see requirements.txt and install only what you need.
+*   Run `python check_backends.py` for backend diagnostics.
+*   For more help, see [GitHub Issues](https://github.com/blairmichaelg/Acoustical/issues).
+
+---
+
+## Folder Structure
 
 ```
-MIT License - Copyright (c) 2024 Michael Blair
+audio_input/                # Audio files or YouTube downloads
+chord_extraction/           # Extraction modules and backend registry
+key_transpose_capo/         # Key/capo logic
+flourish_engine/            # Flourish/AI code
+cli/                        # CLI interface
+web_app/                    # Flask backend, minimal frontend
+common/                     # Shared utilities (error formatting, serialization)
+config.py                   # Centralized configuration
+data/                       # Project files
+tests/                      # Organized tests (e.g., chord_extraction/, flourish_engine/)
+```
+
+## Development & Contributing
+
+*   Each module is documented with docstrings and sample I/O.
+*   Add new extraction or flourish backends as plugins.
+*   Run tests and linting with:
+    ```
+    make test
+    make lint
+    ```
+*   Continuous Integration: All pushes and pull requests are tested and linted via [GitHub Actions](.github/workflows/python-app.yml).
+*   See `/tests` and `/data` for examples.
+*   Open a PR or issue for bugs, features, or questions.
+*   Good first issues are labeled in [GitHub Issues](https://github.com/blairmichaelg/Acoustical/issues).
+
+---
+
+## Example JSON Output
+
+```json
+[
+  {"time": 0.0, "chord": "G"},
+  {"time": 2.5, "chord": "D"}
+]
+```
+
+## AI Prompt Template (for AI/LLM Integration)
+
+This template can be used to generate creative chord suggestions using an AI model:
+
+```
+Given this chord progression in key of G: [G, Em, C, D]
+And these lyrics: “I walked along the riverside…”
+Suggest three chord substitutions or extensions that fit mood.
 ```
 
 ---
 
-## 🙏 Acknowledgments
+## License
 
-- **music21** - For comprehensive music theory support
-- **Essentia** - For advanced audio analysis capabilities
-- **Magenta** - For AI-powered musical creativity
-- **Flask** - For the robust web framework
-- **Click** - For the intuitive CLI framework
+This project is licensed under the MIT license.
+See the [LICENSE](LICENSE) file for details.
 
----
+## Contact
 
-## 💬 Contact & Support
-
-- **Issues:** [GitHub Issues](https://github.com/blairmichaelg/Acoustical/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/blairmichaelg/Acoustical/discussions)
-- **Contributing:** See [CONTRIBUTING.md](CONTRIBUTING.md)
-
----
-
-<div align="center">
-
-**⭐ Star this repository if you find it helpful! ⭐**
-
-Made with ❤️ for singer/songwriters everywhere
-
-</div>
+Open issues or discussions on GitHub for support and ideas.
