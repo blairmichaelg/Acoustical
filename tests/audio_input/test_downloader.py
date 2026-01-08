@@ -126,7 +126,7 @@ class TestDownloadAudio(unittest.TestCase):
             return original_builtins_import(name, *args, **kwargs)
 
         with patch('builtins.__import__', side_effect=import_side_effect_dl), \
-             self.assertRaisesRegex(Exception, "Audio download failed \(yt-dlp error\): Network issue"):
+             self.assertRaisesRegex(Exception, r"Audio download failed \(yt-dlp error\): Network issue"):
             download_audio("fake_url")
 
     @patch('shutil.which')

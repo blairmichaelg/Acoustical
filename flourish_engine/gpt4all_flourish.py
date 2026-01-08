@@ -135,7 +135,7 @@ def suggest_chord_substitutions(
             while made_change_in_pass:
                 made_change_in_pass = False
                 for phrase in global_intro_phrases:
-                    match = re.match(f"^{re.escape(phrase)}\s*[:,]?\s*", active_text, re.IGNORECASE)
+                    match = re.match(rf"^{re.escape(phrase)}\s*[:,]?\s*", active_text, re.IGNORECASE)
                     if match:
                         active_text = active_text[match.end():].strip()
                         made_change_in_pass = True
@@ -171,7 +171,7 @@ def suggest_chord_substitutions(
                     made_item_change = False
                     original_len = len(active_s_part)
                     for phrase in item_intro_phrases:
-                        match = re.match(f"^{re.escape(phrase)}\s*[:,]?\s*", active_s_part, re.IGNORECASE)
+                        match = re.match(rf"^{re.escape(phrase)}\s*[:,]?\s*", active_s_part, re.IGNORECASE)
                         if match:
                             active_s_part = active_s_part[match.end():].strip()
                             if len(active_s_part) < original_len:
