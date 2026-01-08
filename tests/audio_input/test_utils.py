@@ -103,7 +103,7 @@ class TestAudioUtils(unittest.TestCase):
     @patch('audio_input.utils.is_file_size_ok', return_value=False)
     @patch('audio_input.utils.MAX_FILE_SIZE_MB', 5) # For error message
     def test_check_audio_file_raises_too_large(self, mock_size_ok, mock_mime_ok, mock_ext_ok, mock_isfile):
-        with self.assertRaisesRegex(ValueError, "File too large \(>5 MB\): too_large.mp3"):
+        with self.assertRaisesRegex(ValueError, r"File too large \(>5 MB\): too_large.mp3"):
             audio_utils.check_audio_file("too_large.mp3")
 
 if __name__ == '__main__':
